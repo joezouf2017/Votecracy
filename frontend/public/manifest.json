@@ -1,0 +1,10 @@
+{
+  "name": "Votecracy",
+  "short_name": "Votecracy",
+  "description": "Vote on real historical policy decisions. See what actually happened.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f1117",
+  "theme_color": "#0f1117",
+  "icons": []
+}

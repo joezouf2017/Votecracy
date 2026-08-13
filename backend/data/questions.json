@@ -1,0 +1,98 @@
+[
+  {
+    "id": "us-medicare-1965",
+    "category": "medical",
+    "era": "historical",
+    "prompt": "It's 1965. Congress is debating Medicare — federal health insurance for Americans over 65. Opponents warn it's socialism; supporters say millions of seniors can't afford care. Do you vote for it?",
+    "options": ["Support", "Oppose"],
+    "reveal": {
+      "actual_vote": "Passed 307–116 in the House, 68–21 in the Senate",
+      "outcome": "Medicare enrolled 19 million Americans in its first year. Today it covers 67 million people and is consistently rated one of the most popular federal programs. Early cost projections underestimated enrollment by a factor of 10.",
+      "source": "Social Security Amendments of 1965 (Public Law 89-97)"
+    }
+  },
+  {
+    "id": "us-prohibition-1919",
+    "category": "society",
+    "era": "historical",
+    "prompt": "It's 1919. Prohibition advocates say alcohol is destroying families and fueling crime. The 18th Amendment would ban alcohol nationwide. Do you support ratification?",
+    "options": ["Support", "Oppose"],
+    "reveal": {
+      "actual_vote": "Ratified by 46 of 48 states — only Rhode Island and Connecticut refused",
+      "outcome": "Prohibition lasted 13 years. Alcohol consumption fell initially, but it gave rise to organized crime, illegal speakeasies, and widespread government corruption. It was repealed by the 21st Amendment in 1933 — the only amendment ever to repeal another.",
+      "source": "18th Amendment (1919), repealed by 21st Amendment (1933)"
+    }
+  },
+  {
+    "id": "us-interstate-highway-1956",
+    "category": "economy",
+    "era": "historical",
+    "prompt": "It's 1956. President Eisenhower proposes a $25 billion federal highway system — the largest public works project in US history. Critics say it's too expensive and a federal overreach. Do you support the Federal Aid Highway Act?",
+    "options": ["Support", "Oppose"],
+    "reveal": {
+      "actual_vote": "Passed the Senate unanimously, House 388–19",
+      "outcome": "The Interstate Highway System transformed American commerce and military logistics. It also accelerated suburban sprawl and the decline of inner cities and public transit. The final cost exceeded $500 billion in today's dollars. Most economists consider it one of the best infrastructure investments ever made.",
+      "source": "Federal Aid Highway Act of 1956"
+    }
+  },
+  {
+    "id": "us-clean-air-act-1970",
+    "category": "society",
+    "era": "historical",
+    "prompt": "It's 1970. American cities choke with smog; the Cuyahoga River caught fire the year before. The Clean Air Act would give the federal government power to set emission limits on cars and factories. Industry groups warn it will destroy jobs. Do you support it?",
+    "options": ["Support", "Oppose"],
+    "reveal": {
+      "actual_vote": "Passed the Senate 73–0, the House by voice vote — one of the most bipartisan bills ever",
+      "outcome": "Air quality improved dramatically: lead pollution fell 99%, carbon monoxide fell 77%. The EPA estimates the Clean Air Act prevents over 200,000 premature deaths per year. Projected economic benefits exceed costs by more than 30 to 1. The feared job losses did not materialize at the predicted scale.",
+      "source": "Clean Air Act of 1970 (Public Law 91-604)"
+    }
+  },
+  {
+    "id": "us-net-neutrality-2015",
+    "category": "technology",
+    "era": "recent",
+    "prompt": "It's 2015. The FCC is debating Net Neutrality — rules preventing internet providers from slowing specific websites or charging extra for 'fast lanes.' Telecom companies say it will kill investment; advocates say it protects a free internet. Do you support it?",
+    "options": ["Support", "Oppose"],
+    "reveal": {
+      "actual_vote": "FCC voted 3–2 to adopt Net Neutrality rules under Title II",
+      "outcome": "The rules were in effect 2015–2017, then repealed. Broadband investment did not decline during the Net Neutrality period, contradicting industry predictions. The rules were briefly restored in 2024 before being struck down again by federal courts. The debate remains unresolved.",
+      "source": "FCC Open Internet Order (2015), repealed 2017"
+    }
+  },
+  {
+    "id": "us-affordable-care-act-2010",
+    "category": "medical",
+    "era": "recent",
+    "prompt": "It's 2010. The Affordable Care Act would expand Medicaid, require insurers to cover pre-existing conditions, and mandate most Americans buy health insurance. Supporters say 30 million uninsured will gain coverage; opponents call it unconstitutional government overreach. Do you support it?",
+    "options": ["Support", "Oppose"],
+    "reveal": {
+      "actual_vote": "Passed the Senate 60–39, House 219–212 — entirely along party lines",
+      "outcome": "The uninsured rate fell from 16% to 9% by 2015. The individual mandate was later repealed in 2017. The Supreme Court upheld the law twice. Public approval has grown over time and now exceeds 50%, even among groups that initially opposed it.",
+      "source": "Patient Protection and Affordable Care Act (Public Law 111-148)"
+    }
+  },
+  {
+    "id": "us-income-tax-1913",
+    "category": "economy",
+    "era": "historical",
+    "prompt": "It's 1913. Congress is debating the 16th Amendment, which would allow a permanent federal income tax. The initial rate would be just 1% on income above $3,000 (about $90,000 today). Opponents warn rates will inevitably rise. Do you support ratification?",
+    "options": ["Support", "Oppose"],
+    "reveal": {
+      "actual_vote": "Ratified by 42 of 48 states",
+      "outcome": "The income tax started at 1% and rose sharply: by World War II, the top marginal rate hit 94%. Today the federal income tax funds roughly half of all federal spending. The opponents who warned rates would rise were correct; supporters who said it would reduce tariff dependency were also right.",
+      "source": "16th Amendment to the US Constitution (1913)"
+    }
+  },
+  {
+    "id": "uk-national-health-service-1946",
+    "category": "medical",
+    "era": "historical",
+    "prompt": "It's 1946 in postwar Britain. The Labour government proposes the National Health Service — free healthcare for every citizen, funded by taxes. Doctors warn it will destroy medicine. Supporters say no one should die for lack of money. Do you vote for it?",
+    "options": ["Support", "Oppose"],
+    "reveal": {
+      "actual_vote": "Passed Parliament 359–172",
+      "outcome": "The NHS launched in 1948, with 5 million dental treatments and 8 million optical appointments in its first year — far exceeding projections. Infant mortality fell sharply and life expectancy improved. The NHS is consistently rated the UK's most beloved institution, though chronic underfunding debates continue 75+ years later.",
+      "source": "National Health Service Act 1946 (UK)"
+    }
+  }
+]
