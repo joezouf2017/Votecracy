@@ -29,7 +29,9 @@ async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, { credentials: 'include', ...options })
 
   if (!res.ok) {
-    const err = new Error(`${options.method ?? 'GET'} ${path} failed with ${res.status}`)
+    const err = new Error(
+      `${options.method ?? 'GET'} ${path} failed with ${res.status}`
+    )
     err.status = res.status
     try {
       err.detail = (await res.json()).detail

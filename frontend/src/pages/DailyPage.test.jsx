@@ -118,7 +118,9 @@ describe('status codes', () => {
   it('409 shows the reveal rather than an error', async () => {
     // Another tab already cast this player's vote. Their vote stands — the
     // only correct response is to show them what they voted for.
-    submitDailyVote.mockRejectedValue(httpError(409, "You've already voted on today's question."))
+    submitDailyVote.mockRejectedValue(
+      httpError(409, "You've already voted on today's question.")
+    )
 
     render(<DailyPage />)
     await userEvent.click(await screen.findByRole('button', { name: 'Support' }))
@@ -130,7 +132,7 @@ describe('status codes', () => {
 
   it('503 keeps the player on the vote screen with a retryable message', async () => {
     submitDailyVote.mockRejectedValue(
-      httpError(503, 'Voting is temporarily unavailable. Please try again in a moment.'),
+      httpError(503, 'Voting is temporarily unavailable. Please try again in a moment.')
     )
 
     render(<DailyPage />)

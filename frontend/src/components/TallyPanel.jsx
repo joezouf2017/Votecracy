@@ -13,7 +13,10 @@ export default function TallyPanel({ tally, totalVotes, available, availableAt }
         <span className="stat-label">How everyone else voted</span>
         <p>
           Unlocks when today&apos;s vote closes —{' '}
-          {unlocks.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+          {unlocks.toLocaleString(undefined, {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+          })}
         </p>
       </div>
     )

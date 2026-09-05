@@ -48,13 +48,19 @@ describe('credentials', () => {
 describe('error shape', () => {
   // Callers branch on these. A thrown Error without `.status` collapses 409,
   // 403 and 503 into one generic failure and takes the UX with it.
-  it.each([409, 403, 503, 400, 404])('exposes status %i on the thrown error', async (status) => {
-    global.fetch.mockResolvedValue(
-      jsonResponse({ detail: 'nope' }, { ok: false, status }),
-    )
+  it.each([409, 403, 503, 400, 404])(
+    'exposes status %i on the thrown error',
+    async (status) => {
+      global.fetch.mockResolvedValue(
+        jsonResponse({ detail: 'nope' }, { ok: false, status })
+      )
 
-    await expect(fetchDailyResults()).rejects.toMatchObject({ status, detail: 'nope' })
-  })
+      await expect(fetchDailyResults()).rejects.toMatchObject({
+        status,
+        detail: 'nope',
+      })
+    }
+  )
 
   it('still throws with a status when the error body is not JSON', async () => {
     global.fetch.mockResolvedValue({
