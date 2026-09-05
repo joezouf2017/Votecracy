@@ -18,6 +18,102 @@ The live path never calls a language model. Historical claims are served from a
 curated content store, never generated at request time — a model that invents a
 plausible-sounding outcome would break the only promise the game makes.
 
+## The chatbot is a third path
+
+A retrieval chatbot fits neither box. It serves HTTP *and* calls a language
+model, so "the live path never calls a model" and "the pipeline never runs on a
+request path" both exclude it. It gets its own package and its own failure mode:
+if it is slow or down, chatting degrades and voting is untouched. It must never
+sit between a player and their vote.
+
+That also makes it the largest standing risk to the vote-first rule. Everything
+else the server returns is structured data it fully controls; the chatbot
+generates free text in front of the player.
+
+So the rule is enforced the same way it is everywhere else — structurally.
+Before a player votes, the retrieval scope contains only `framing` chunks for
+that question. The outcome material is not in the index the model can cite from,
+so a prompt injection or a carelessly worded system prompt still cannot leak it.
+Gating on a "has voted" flag alone would be enforcement by instruction, which is
+the weaker kind.
+
+## Code layout and the import rule
+
+Two systems that must not blur is a claim about the code, so the directories say
+it:
+
+```
+backend/game/       the request path      — must never call a language model
+backend/pipeline/   offline batch work    — must never run on a request path
+backend/shared/     db, settings, logging
+```
+
+`backend/tests/test_layering.py` walks the import graph and fails if anything in
+`game/` imports `pipeline/`. That is the difference between a principle in a
+document and one that survives a busy afternoon.
+
+The split was not a correction of a bad design. A flat package was right at
+seven modules and about 700 lines of one system; packaging it then would have
+created an empty `pipeline/`. It became wrong as the pipeline grew:
+
+| | lines, at the time of the split |
+|---|---|
+| live game path | 703 |
+| offline pipeline | **1,243** |
+| shared | 525 |
+
+The pipeline had become 1.77x the size of the game it serves and nothing in the
+layout said so. **The mistake was the lag, not the original choice** — the
+imbalance was noticed at 1.49x and acted on at 1.77x. The signal worth watching
+is measurable: lines per package, and whether one module has started serving two
+callers with nothing in common. Not "this file feels long".
+
+### Two things were considered for splitting and deliberately left whole
+
+The reasoning matters more than the verdict, because line count on its own is
+the wrong trigger.
+
+- **`game/daily.py`, 268 lines.** Nine helpers and three routes, and every
+  helper is about daily mode — time boundaries, question selection, tally
+  unlocking, degradation policy. Splitting router from service would leave three
+  thin handlers and one file still holding everything else. Cohesion is high;
+  revisit around 400 lines, or when a second feature starts using its helpers.
+- **`pipeline/sources.py`, 317 lines — this one *was* split**, into `sources`
+  (which source can serve this need) and `queries` (what request to send it).
+  Not on line count: the seam was already marked with a comment, and the fetch
+  layer grows only the second half, since per-source adapters are about
+  addressing and parsing. Separating it cost twenty minutes; separating it after
+  five adapters had piled onto one side would not have.
+
+### Chunk boundaries, and a lesson about measuring
+
+`ingest.chunk` originally sliced at a fixed 1,000 characters with 150 overlap —
+the common RAG baseline, but not the recommended one. Both `chunk` and
+`extract_passages` now snap to a paragraph, sentence, line or word boundary,
+with `size` as a ceiling. Measured against the source volume, mid-word edges went
+from **271 of 430 (63%) to 0**.
+
+Three different figures were reported for that before the right one. "72%"
+counted chunks *starting with a lower-case letter*, which a chunk opening
+cleanly on "the" also does. "51%" measured cuts correctly but only *within* each
+passage, missing that passage extraction was itself landing mid-word 67% of the
+time, so every passage's first and last chunk inherited a bad edge.
+
+Both errors were the same error: the measurement was scoped more narrowly than
+the thing being claimed. The scope that matters is the source volume, because
+that is where a citation points. Worth remembering for any "we fixed X%" claim
+about this pipeline.
+
+Two deviations from standard chunking are deliberate and should survive:
+character offsets back into the source, because rule #2 makes span citations
+mandatory; and extracting relevant passages before chunking, because a
+Congressional Record volume is 14.3M characters of which 1.18% is relevant.
+
+Still missing, and good practice since 2024: **contextual retrieval** —
+prepending a document-level summary to each chunk before embedding. Especially
+relevant here, because a fragment of the Congressional Record read in isolation
+gives no clue which bill it is about.
+
 ## Enforcing the vote-first rule
 
 Nothing about the outcome may reach the client before a vote is cast. This is
@@ -59,6 +155,11 @@ fetch ──► normalise ──► extract ──► chunk ──► embed ─�
                                                           ▼
                                        generate ──► verify ──► human review
 ```
+
+The first box runs backwards from the rest — it reads a corpus and emits
+candidates rather than taking a question as input. That inversion is what gives
+the question bank a supply story, and it has its own hazards:
+[`candidate-generation.md`](candidate-generation.md).
 
 ### The boundary is a date, not a source type
 
@@ -117,6 +218,24 @@ the boundary itself. `source_documents.published_date` is NOT NULL to force
 this: a document whose date cannot be established belongs on neither side of the
 boundary, and a nullable column invites a query that treats NULL as "before".
 
+### The Congressional Record records arguments, not facts
+
+It faithfully records that a senator said half of seniors had no insurance. It
+is not evidence that they did. So any figure taken from debate has to be
+attributed, never asserted:
+
+> Senator X told the Senate that half of seniors had no coverage.
+> [Congressional Record, 1965-07-09]
+
+Stating it flat launders one side's advocacy into neutral fact — a neutrality
+violation wearing the costume of a factual answer, and the harder kind to spot
+because the sentence looks like every other sourced sentence.
+
+This is load-bearing right now rather than a future concern: no statistical
+source is in the whitelist yet, so `outcome` retrieval currently resolves to the
+Congressional Record — a record of what was *said* about effects, not evidence
+of them. Everything numeric drawn from it has to name a speaker.
+
 ### Verification is layered, and the layers are not interchangeable
 
 Three checks, cheapest and most deterministic first.
@@ -146,6 +265,9 @@ have known" is an argument about the pipeline, and an argument is not a test.
 the sources are not spoilers — "medicare" and "hospital" are all over the 1965
 record — and on that question 28 distinct reveal words reduce to 4. The numbers
 are the half that matters: 307 and 116, the House margin.
+
+Each of these layers has a number attached to it, and the targets pull against
+each other on purpose: [`evaluation.md`](evaluation.md).
 
 ### Storage is three layers, ordered by what it costs to lose
 
