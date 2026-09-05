@@ -174,9 +174,15 @@ source_chunks = Table(
     # Record document on the same day.
     #
     # This is a second filter, never an alternative one. Pre-vote scope is
-    # `published_date < decision_date AND role != 'outcome'` — a conjunction,
-    # so role can only ever remove material from the date window. It cannot
-    # admit anything published after the decision.
+    # `published_date < decision_date AND role = 'framing'` — a conjunction, so
+    # role can only ever remove material from the date window, never admit
+    # anything published after the decision.
+    #
+    # A whitelist rather than `role != 'outcome'`, and the difference is real:
+    # a rejected amendment's vote counts are `vote_record` and are published
+    # *before* the decision, so neither the date filter nor an exclusion of
+    # `outcome` would catch them — and margins are exactly what leaks the
+    # result. Only `framing` reaches a player who hasn't voted.
     Column("role", String(32), nullable=False),
     Column("ordinal", Integer, nullable=False),  # position within the document
     # Offsets into source_documents.text. Not optional: rule #2 is enforced by
