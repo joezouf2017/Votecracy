@@ -71,9 +71,9 @@ pip install -r backend/requirements-dev.txt
 ## Tests
 
 ```bash
-python -m pytest backend -q        # 120 backend tests, venv active
+python -m pytest backend -q        # backend, venv active
 
-cd frontend && npm test            # 21 frontend tests
+cd frontend && npm test            # frontend
 ```
 
 Both run on the host in seconds, with no containers. Redis and Postgres are
