@@ -1,4 +1,9 @@
-export default function RevealCard({ reveal, onPlayAgain }) {
+export default function RevealCard({
+  reveal,
+  onPlayAgain,
+  actionLabel = 'Next Question',
+  children,
+}) {
   return (
     <div className="card reveal-card">
       <div className="reveal-header">
@@ -16,9 +21,12 @@ export default function RevealCard({ reveal, onPlayAgain }) {
         <p>{reveal.outcome}</p>
       </div>
       <div className="source">Source: {reveal.source}</div>
-      <button className="play-again-btn" onClick={onPlayAgain}>
-        Next Question
-      </button>
+      {children}
+      {onPlayAgain && (
+        <button className="play-again-btn" onClick={onPlayAgain}>
+          {actionLabel}
+        </button>
+      )}
     </div>
   )
 }

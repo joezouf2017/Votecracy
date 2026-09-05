@@ -1,4 +1,16 @@
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
+
+# Phase 2 — distributed voting.
+# redis: atomic dedupe + vote tally on the hot path (see cache.py).
+# sqlalchemy + psycopg: durable vote log written off the request path (see db.py).
+redis==5.0.8
+sqlalchemy==2.0.35
+psycopg[binary]==3.2.3
+
+# Test-only.
+# fakeredis lets the vote-tally tests run the real Lua script against an
+# in-process Redis, so concurrency behaviour is exercised without a container.
 pytest==8.3.3
 httpx==0.27.2
+fakeredis[lua]==2.24.1

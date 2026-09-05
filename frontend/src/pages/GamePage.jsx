@@ -39,21 +39,15 @@ export default function GamePage() {
   }
 
   return (
-    <div className="page">
-      <header className="app-header">
-        <h1>Votecracy</h1>
-        <p className="tagline">Vote first. Then see what history decided.</p>
-      </header>
-      <main className="main-content">
-        {phase === 'loading' && <div className="status">Loading...</div>}
-        {phase === 'error' && <div className="status error">{error}</div>}
-        {phase === 'voting' && question && (
-          <QuestionCard question={question} onVote={handleVote} loading={false} />
-        )}
-        {phase === 'revealed' && reveal && (
-          <RevealCard reveal={reveal} onPlayAgain={loadQuestion} />
-        )}
-      </main>
-    </div>
+    <>
+      {phase === 'loading' && <div className="status">Loading...</div>}
+      {phase === 'error' && <div className="status error">{error}</div>}
+      {phase === 'voting' && question && (
+        <QuestionCard question={question} onVote={handleVote} loading={false} />
+      )}
+      {phase === 'revealed' && reveal && (
+        <RevealCard reveal={reveal} onPlayAgain={loadQuestion} />
+      )}
+    </>
   )
 }
