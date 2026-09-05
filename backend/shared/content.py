@@ -35,6 +35,17 @@ VOTE_TYPES = frozenset(
 # this codebase; a list of things to remember to hide is the weaker kind.
 _PUBLIC_FIELDS = frozenset({"id", "category", "era", "prompt", "options"})
 
+# What a `reveal` block must carry. These are the names `game.schemas.RevealData`
+# requires, and `main.vote` reaches them by splatting `**q["reveal"]` straight
+# into it — so a question missing one produces a 500 on the vote endpoint, for
+# that question only, with nothing wrong at startup.
+#
+# The list cannot be imported from `RevealData`: `shared/` may not import
+# `game/` (test_layering enforces it, and the pipeline has to validate content
+# without the web layer present). `test_questions.py` ties the two together
+# instead, so the duplication is checked rather than merely intended.
+REVEAL_FIELDS = ("actual_vote", "outcome", "source")
+
 
 def _validate(q: dict) -> None:
     """Reject a malformed question at import time.
@@ -61,6 +72,16 @@ def _validate(q: dict) -> None:
             f"question {qid!r} has an unparseable decision_date "
             f"{q['decision_date']!r}: {exc}"
         ) from exc
+
+    # The reveal is the one block a player-facing endpoint dereferences by
+    # name. Validating it here is what keeps a malformed question a startup
+    # failure rather than a 500 on the vote that surfaces it.
+    reveal = q.get("reveal")
+    if not isinstance(reveal, dict):
+        raise ValueError(f"question {qid!r} is missing its 'reveal' block")
+    for field in REVEAL_FIELDS:
+        if not isinstance(reveal.get(field), str) or not reveal[field].strip():
+            raise ValueError(f"question {qid!r} has a missing or empty reveal.{field}")
 
     # `retrieval` is what `formulate_query` addresses a source with. Only
     # search_terms is required: `bill_number` and `congress` are congressional

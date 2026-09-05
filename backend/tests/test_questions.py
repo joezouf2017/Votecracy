@@ -73,3 +73,37 @@ def test_health(client):
     r = client.get("/health")
     assert r.status_code == 200
     assert r.json()["questions_loaded"] >= 5
+
+
+# --- the two field lists that are written down twice --------------------------
+#
+# `shared/` may not import `game/`, so `content` cannot take these names from
+# the response models it has to agree with. That makes them duplicated by
+# necessity rather than by neglect — and duplication that nothing checks is
+# just a comment. These two tests are the check.
+
+
+def test_reveal_fields_match_what_the_vote_endpoint_splats():
+    """`main.vote` builds RevealData with `**q["reveal"]` plus three names it
+    supplies itself. Anything else RevealData requires has to come from the
+    reveal block, so that is what `content` must validate — otherwise a
+    question missing a field is a 500 on the vote that surfaces it, and only
+    on that question."""
+    from game.schemas import RevealData
+    from shared import content
+
+    supplied_by_the_endpoint = {"your_choice", "category", "era"}
+    assert set(RevealData.model_fields) - supplied_by_the_endpoint == set(
+        content.REVEAL_FIELDS
+    )
+
+
+def test_public_fields_match_the_pre_vote_response_model():
+    """`public_view` is rule #1's whitelist and `QuestionSummary` is the API's.
+    They are the same five names in two packages; the Phase 3 chatbot will go
+    through the first and not the second, so a field added to one and not the
+    other is either a leak or a missing field."""
+    from game.schemas import QuestionSummary
+    from shared import content
+
+    assert set(QuestionSummary.model_fields) == content._PUBLIC_FIELDS

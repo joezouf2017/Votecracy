@@ -183,6 +183,11 @@ VALID_METADATA = {
         "congress": 89,
         "search_terms": ["Medicare"],
     },
+    "reveal": {
+        "actual_vote": "Passed 313-115",
+        "outcome": "19 million enrolled in the first year.",
+        "source": "Public Law 89-97",
+    },
 }
 
 
@@ -209,6 +214,19 @@ def test_validate_accepts_the_baseline_the_other_cases_break():
         (
             {"retrieval": {"search_terms": ["ok"], "congress": "89"}},
             "non-integer congress",
+        ),
+        # The reveal is the one block a player-facing endpoint dereferences by
+        # name — `main.vote` splats it into RevealData — so a question missing
+        # a field here is a 500 on the vote that surfaces it, and only on that
+        # question. Checked at import for the same reason decision_date is.
+        ({"reveal": None}, "missing its 'reveal' block"),
+        ({"reveal": []}, "missing its 'reveal' block"),
+        ({"reveal": {"outcome": "o", "source": "s"}}, "reveal.actual_vote"),
+        ({"reveal": {"actual_vote": "v", "source": "s"}}, "reveal.outcome"),
+        ({"reveal": {"actual_vote": "v", "outcome": "o"}}, "reveal.source"),
+        (
+            {"reveal": {"actual_vote": "v", "outcome": "o", "source": "  "}},
+            "reveal.source",
         ),
     ],
 )
