@@ -44,8 +44,18 @@ from settings import get_settings
 
 metadata = MetaData()
 
-# Gemini text-embedding-004. Changing this invalidates every stored vector, so
-# `chunk_embeddings.model` records which model produced each one.
+# Deliberately 768, not the model's default. gemini-embedding-001 returns 3072
+# dimensions; asking for 768 yields the first 768 components of that vector,
+# which is a supported truncation and a quarter of the storage — measured at
+# 500 questions, 472 MB against roughly 1.9 GB.
+#
+# Retrieval here is always scoped to a single question, a few hundred chunks
+# rather than the whole table, so the ranking problem is easy enough that the
+# extra dimensions buy very little.
+#
+# Changing this invalidates every stored vector, which is why
+# `chunk_embeddings.model` records what produced each one. See embedding.py for
+# why the truncated vectors have to be renormalised before they are stored.
 EMBEDDING_DIM = 768
 
 
