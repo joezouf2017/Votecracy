@@ -230,3 +230,127 @@ def test_subject_reads_the_cq_style_header():
 
 def test_subject_is_absent_from_the_verb_first_format():
     assert voteview.subject("TO PASS H.R. 17255.") is None
+
+
+# --- signals ------------------------------------------------------------------
+#
+# Deliberately separate numbers rather than one score. Validated against the
+# hand-written questions, where a combined score would have been wrong: Clean
+# Air is 375-1 and perfectly predicted, ACA is 60-39 and perfectly predicted,
+# Medicare is contested on both axes, and all three are good questions.
+
+
+def test_closeness_is_zero_for_a_unanimous_vote():
+    [c] = voteview.candidates([row(yea_count="100", nay_count="0")])
+    assert c.signals.closeness == 0.0
+
+
+def test_closeness_is_a_half_for_a_dead_even_vote():
+    [c] = voteview.candidates([row(yea_count="50", nay_count="50")])
+    assert c.signals.closeness == 0.5
+
+
+def test_a_perfectly_predicted_vote_breaks_no_coalitions():
+    """log-likelihood 0 means the spatial model called every vote, so nobody
+    crossed their usual position — the signature of a party-line vote whether
+    it was 375-1 or 60-39."""
+    [c] = voteview.candidates([row(nominate_log_likelihood="0")])
+    assert c.signals.coalition_break == pytest.approx(0.0)
+
+
+def test_coalition_break_is_normalised_by_the_number_voting():
+    """Otherwise a House vote always looks messier than a Senate one, and 1850
+    always looks messier than 2010, purely from chamber size."""
+    house = voteview.candidates(
+        [row(yea_count="200", nay_count="200", nominate_log_likelihood="-400")]
+    )[0]
+    senate = voteview.candidates(
+        [row(yea_count="50", nay_count="50", nominate_log_likelihood="-100")]
+    )[0]
+    assert house.signals.coalition_break == pytest.approx(
+        senate.signals.coalition_break
+    )
+
+
+def test_attention_counts_every_roll_call_on_the_measure_not_only_passage():
+    """Congress voting on something nine times is Congress struggling with it,
+    and most of those nine are amendments and motions, not the passage."""
+    [c] = voteview.candidates(
+        [
+            row(),
+            row(rollnumber="200", dtl_desc="TO AMEND H.R. 17255 BY STRIKING TITLE II."),
+            row(rollnumber="201", dtl_desc="TO RECOMMIT H.R. 17255."),
+        ]
+    )
+    assert c.signals.attention == 3
+
+
+def test_a_measure_with_no_passage_vote_produces_no_candidate():
+    assert voteview.candidates([row(dtl_desc="TO RECOMMIT H.R. 17255.")]) == []
+
+
+# --- ranking ------------------------------------------------------------------
+
+
+def test_attention_is_ranked_within_its_own_congress():
+    """Raw counts are not comparable across eras — legislative practice
+    changed, and ranking on them globally over-selected the 19th century by
+    1.55x in the top 1,000. That is the set-level skew the Phase 3 balance
+    audit exists to catch, showing up inside the ranking itself."""
+    old = [
+        row(
+            congress="20",
+            bill_number="HR1",
+            date="1828-01-01",
+            dtl_desc="TO PASS H.R. 1.",
+        )
+    ] + [
+        row(
+            congress="20",
+            bill_number="HR1",
+            date="1828-01-02",
+            rollnumber=str(i),
+            dtl_desc="TO AMEND H.R. 1.",
+        )
+        for i in range(30)
+    ]
+    modern = [
+        row(
+            congress="111",
+            bill_number="HR9",
+            date="2010-01-01",
+            dtl_desc="TO PASS H.R. 9.",
+        )
+    ]
+    ranked = voteview.rank(voteview.candidates(old + modern))
+    # Each measure is alone in its congress, so both sit at the top of it.
+    assert {c.signals.attention_percentile for c in ranked} == {1.0}
+    assert ranked[0].signals.attention == 31
+
+
+def test_ranking_is_reproducible():
+    """A review queue that reshuffles between runs cannot be worked through."""
+    cands = voteview.candidates(
+        [
+            row(),
+            row(
+                congress="92",
+                bill_number="HR9",
+                date="1972-01-01",
+                dtl_desc="TO PASS H.R. 9.",
+            ),
+        ]
+    )
+    assert len(cands) == 2
+    assert [c.bill_number for c in voteview.rank(cands)] == [
+        c.bill_number for c in voteview.rank(list(reversed(cands)))
+    ]
+
+
+def test_the_prompt_generator_is_not_shown_the_signals_either():
+    """closeness is computed from yea/nay, so it leaks the margin by another
+    route: 0.003 says "near-unanimous" as plainly as 375-1 does. The whitelist
+    excludes it without needing to know that, which is the point of a
+    whitelist."""
+    [c] = voteview.candidates([row()])
+    assert "signals" not in voteview.for_prompt_generation(c)

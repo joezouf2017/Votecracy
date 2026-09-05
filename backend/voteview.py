@@ -21,9 +21,11 @@ the container while every test still passed.
 
 import csv
 import logging
+import math
 import re
 import urllib.request
-from dataclasses import dataclass
+from bisect import bisect_right
+from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path
 
@@ -113,6 +115,74 @@ _CQ_HEADER = re.compile(r"^[A-Z][A-Z.\s]*\d+\.\s+([A-Z][A-Z0-9 ,'&/-]{6,70}?)\."
 
 
 @dataclass(frozen=True)
+class Signals:
+    """Measurable properties of a candidate, for ranking and for auditing.
+
+    Deliberately *not* combined into a single score. Checked against the eight
+    hand-written questions, a combined score would have been actively wrong:
+
+        Medicare 1965   313-115   closeness 0.269   coalition_break 0.246
+        Clean Air 1970  375-1     closeness 0.003   coalition_break 0.000
+        ACA 2009        60-39     closeness 0.394   coalition_break 0.002
+
+    All three are good questions, and they have nothing in common on either
+    axis. Clean Air was near-unanimous — which is exactly what makes it a good
+    question, because a modern reader thinks the answer is obvious and 1970's
+    industry did not. ACA was nearly a tie *and* perfectly predicted by
+    ideology, the signature of a party-line vote. Any single score ranks Clean
+    Air near the bottom.
+
+    So `attention` ranks, and the other two describe *what kind* of question
+    this is rather than how good it is. Keeping them separate is also what lets
+    the Phase 3 set-balance audit see whether the bank over-selects one shape.
+    """
+
+    # How many roll calls the measure took in total. The significance proxy:
+    # the median measure in the corpus takes one, while all six of the
+    # hand-written questions with a bill number sit at the 86th-100th
+    # percentile. Congress voting on something nine times is Congress
+    # struggling with it.
+    attention: int
+    # `attention` ranked against the other measures of the *same congress*, 0..1.
+    #
+    # Raw counts are not comparable across eras: legislative practice changed,
+    # and ranking on them globally over-selected the 19th century by 1.55x in
+    # the top 1,000. That is precisely the set-level skew the Phase 3 balance
+    # audit exists to catch, and it turned up inside the ranking itself.
+    #
+    # Normalising per congress makes the ranking era-neutral. How many
+    # questions to draw from each era is then a separate and *visible*
+    # decision, rather than something smuggled into a score.
+    attention_percentile: float = 0.0
+    # 0 = unanimous, 0.5 = dead even.
+    closeness: float = 0.0
+    # Share of the vote the DW-NOMINATE spatial model fails to predict, so
+    # roughly "how many members voted against their usual position". Near zero
+    # means the usual coalitions held, whether the vote was 375-1 or 60-39.
+    coalition_break: float = 0.0
+    # Members voting. Distinguishes a measure the chamber turned out for from
+    # a thinly-attended routine one.
+    turnout: int = 0
+
+
+def _signals(passage: dict, measure_rows: list[dict]) -> Signals:
+    yea, nay = int(passage["yea_count"]), int(passage["nay_count"])
+    total = yea + nay
+    if total == 0:
+        return Signals(attention=len(measure_rows))
+    log_likelihood = float(passage.get("nominate_log_likelihood") or 0.0)
+    # exp(ll/n) is the geometric-mean probability the spatial model assigned to
+    # the votes actually cast; 1 means it called every one. The normalisation
+    # by n is what makes House and Senate, 1850 and 2010, comparable.
+    return Signals(
+        attention=len(measure_rows),
+        closeness=min(yea, nay) / total,
+        coalition_break=1.0 - math.exp(log_likelihood / total),
+        turnout=total,
+    )
+
+
+@dataclass(frozen=True)
 class Candidate:
     """A decision that could become a question. Not playable on its own."""
 
@@ -125,6 +195,7 @@ class Candidate:
     vote_type: str
     subject: str | None
     description: str
+    signals: Signals
     # What a human still has to supply before this can enter the bank. Empty
     # means the structured half is complete. Never silently defaulted — the
     # same reason `select_sources` raises rather than falling back.
@@ -180,11 +251,17 @@ def candidates(rows) -> list[Candidate]:
     became public. If the House passes in April and the Senate in July, a
     newspaper printed in May already reports a result.
     """
-    by_measure: dict[tuple[str, str], list[dict]] = {}
+    all_rows: dict[tuple[str, str], list[dict]] = {}
     for row in rows:
         key = _measure_key(row)
-        if key and classify(row) == "passage":
-            by_measure.setdefault(key, []).append(row)
+        if key:
+            all_rows.setdefault(key, []).append(row)
+
+    by_measure = {
+        key: passage
+        for key, group in all_rows.items()
+        if (passage := [r for r in group if classify(r) == "passage"])
+    }
 
     out = []
     for (congress, bill), group in by_measure.items():
@@ -207,6 +284,7 @@ def candidates(rows) -> list[Candidate]:
                 ),
                 subject=subject(first["dtl_desc"]),
                 description=first["dtl_desc"].strip(),
+                signals=_signals(first, all_rows[(congress, bill)]),
                 gaps=(
                     (
                         "decision_date: this is Congress proposing the amendment. The "
@@ -218,7 +296,7 @@ def candidates(rows) -> list[Candidate]:
                 ),
             )
         )
-    return sorted(out, key=lambda c: (c.vote_date, c.bill_number))
+    return _with_percentiles(sorted(out, key=lambda c: (c.vote_date, c.bill_number)))
 
 
 # The fields a prompt generator is allowed to see.
@@ -238,6 +316,52 @@ _GENERATOR_FIELDS = ("bill_number", "congress", "vote_date", "vote_type", "subje
 def for_prompt_generation(candidate: Candidate) -> dict:
     """The only shape of a candidate a prompt generator may be shown."""
     return {field: getattr(candidate, field) for field in _GENERATOR_FIELDS}
+
+
+def _with_percentiles(cands: list[Candidate]) -> list[Candidate]:
+    """Fill in each candidate's attention percentile within its own congress."""
+    per_congress: dict[int, list[int]] = {}
+    for c in cands:
+        per_congress.setdefault(c.congress, []).append(c.signals.attention)
+    for values in per_congress.values():
+        values.sort()
+
+    out = []
+    for c in cands:
+        peers = per_congress[c.congress]
+        at_or_below = bisect_right(peers, c.signals.attention)
+        out.append(
+            replace(
+                c,
+                signals=replace(
+                    c.signals, attention_percentile=at_or_below / len(peers)
+                ),
+            )
+        )
+    return out
+
+
+def rank(cands: list[Candidate]) -> list[Candidate]:
+    """Most-worth-reviewing first.
+
+    Ranks on `attention_percentile` alone, because that is the only signal
+    validated against the existing questions — see `Signals`. The other two describe the
+    shape of a question rather than its worth, and folding them in would bury
+    the near-unanimous ones.
+
+    This is a proxy, and an honest one rather than a good one. The real
+    significance signal is whether a law has a popular name, which lives in
+    the Law Revision Counsel's table and is a separate bulk download. Until
+    that lands, "Congress had to vote on this nine times" is what the corpus
+    can say by itself.
+
+    Ties break on date then bill number so the order is reproducible; a review
+    queue that reshuffles between runs cannot be worked through.
+    """
+    return sorted(
+        cands,
+        key=lambda c: (-c.signals.attention_percentile, c.vote_date, c.bill_number),
+    )
 
 
 def download_corpus(path: Path) -> Path:
