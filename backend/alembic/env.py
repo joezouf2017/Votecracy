@@ -6,16 +6,11 @@ which is the same place the application gets it — including the
 DATABASE_URL needs. One decision about how to connect, not two that can drift.
 """
 
-import sys
 from logging.config import fileConfig
-from pathlib import Path
 
 from alembic import context
 
-# backend/ on the path so `db` is importable when alembic runs from backend/
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-import db  # noqa: E402
+import db
 
 config = context.config
 

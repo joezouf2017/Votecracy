@@ -1,0 +1,27 @@
+# The backend is not an installed package — it is a directory of modules that
+# `main.py` imports flat. That is fine for its size, but it means `backend/`
+# has to be on sys.path, and until now two files did that by hand. Both had a
+# native declarative equivalent: this file for pytest, and `prepend_sys_path`
+# in alembic.ini (already present) for Alembic.
+
+[tool.pytest.ini_options]
+pythonpath = ["backend"]
+testpaths = ["backend"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+# Alembic writes these; formatting them means fighting the generator on every
+# autogenerate. They are reviewed by hand instead.
+extend-exclude = ["backend/alembic/versions"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle
+    "F",   # pyflakes — unused imports and names, the check that needed a
+           # hand-written AST script during the audit
+    "I",   # import sorting
+    "UP",  # pyupgrade
+    "B",   # bugbear
+    "SIM", # simplify
+]
