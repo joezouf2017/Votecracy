@@ -157,3 +157,96 @@ decided by **what fraction of the corpus you need**:
    but empty is visible rather than silently thin.
 4. `pypdf` joins the runtime dependencies if pre-1994 congressional material
    is in scope — and it is, for five of eight questions.
+
+---
+
+# Addendum: archive.org as the pre-1994 bulk source
+
+Measured after the above, because "restrict the eras" turned out to be the
+wrong question. The right one was "is there a cheaper source for the same
+years", and there is.
+
+## The volume-boundary trick
+
+Only the volume **spanning** the decision date needs day-level precision. A
+volume that ends before the decision contains nothing after it, so it is safe
+at volume granularity — no granule parsing, no PDF.
+
+Internet Archive's `sim_congressional-record-*` collection is a systematic
+microfilm digitisation, openly accessible (`access-restricted-item: None`, not
+in a lending collection), and every item carries its span in the title. For
+Medicare's decision of 1965-04-08 the 1965 volumes fall out cleanly:
+
+```
+March 24 – April 6    entirely before   -> archive.org plain text
+April 7  – April 27   spans the decision -> GovInfo granules, day precision
+April 28 – May 10     entirely after     -> outcome
+```
+
+**Exactly one boundary volume.**
+
+## What it costs
+
+Framing for 1965-01-01 to the decision:
+
+| | hybrid | all GovInfo |
+|---|---|---|
+| download | **111 MB** | 2.4–7.2 GB |
+| PDF extractions | **1** | 60–180 |
+| CPU | ~11 s | 11–33 min |
+
+The five pre-decision volumes are 71.3 MB of plain `_djvu.txt` between them;
+the boundary volume costs one 40 MB granule PDF.
+
+pypdf stops being a hot path and becomes a single call at the boundary, which
+removes the main argument for restricting the project to 1994 onwards.
+
+## Is the text good enough?
+
+Yes, checked on the March 24 – April 6, 1965 volume (14.5M characters):
+
+- **96.4% of lines are mostly alphabetic** — a reasonable proxy for clean OCR.
+- The Medicare debate is there: 69 × "medicare", 24 × "H.R. 6675", 7 ×
+  "King-Anderson", 198 × "social security".
+- Prose reads correctly, including terms OCR usually mangles —
+  "radiologists, pathologists, physiatrists, and anesthesiologists", "Blue
+  Cross", "Kerr-Mills".
+- Volume size cross-checks against GovInfo: ~14 MB of text for ~15 session
+  days, against GovInfo's measured 948K characters per day. The two sources
+  agree on how much text exists, so archive.org's is not a truncated rendition.
+
+## Two things that must happen before the text is stored
+
+**De-hyphenate.** The column layout leaves **66,119 line-break hyphenations**
+in one volume; 65 of "hospital"'s 814 occurrences are split as `hos-\npital`,
+about 8%. Rejoining recovers them (814 → 889) and — verified — does not damage
+genuine compounds: King-Anderson 7 → 8, Kerr-Mills 13 → 13, Blue Cross 21 →
+21, old-age 23 → 23.
+
+What protects the compounds is that the rule only joins when the character
+after the hyphen is **lower case**: "King-Anderson" has a capital there.
+The residual risk is a lower-case compound that happens to break at its own
+hyphen — `old-\nage` would become `oldage`. Not observed in this volume, but
+it is the failure mode to watch.
+
+**Store the normalised text, not the raw download.** The rule #2 grounding
+check verifies a `(document_id, char_span)` citation against
+`source_documents.text`. Normalising changes every offset after the first
+edit, so if the raw text is stored and the normalised text is chunked, every
+citation points into a different string. The raw download belongs in the
+disposable fetch cache; `source_documents.text` is the canonical form, and the
+rule is simply: **store the text you cite against.**
+
+## Caveats on coverage
+
+- Title spans parse for **17 of 25** 1965 items. The failures are whole-year
+  and appendix items ("Congressional Record 1965: Vol 111", "January 4–June
+  30, 1965 APPEND"). An item whose span cannot be established has to be
+  dropped — safe, but lossy, and much worse than GovInfo's 100% granule-title
+  parse rate.
+- One item that *looks* like a boundary volume (1965-01-04 to 1965-10-23) is
+  the **index**, not content. Without a class filter it would trigger the
+  expensive day-precision path for nothing.
+- Coverage was checked for 1965 only. Item counts by decade suggest the 1960s
+  are the best served, which is convenient — that is exactly where Chronicling
+  America has collapsed and GovInfo's PDFs are most expensive.
