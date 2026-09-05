@@ -33,7 +33,12 @@ def imports_of(path: Path) -> set[str]:
 
 
 def modules_in(package: str) -> list[Path]:
-    return sorted((BACKEND / package).glob("*.py"))
+    """Every module in the package, subpackages included.
+
+    `glob` rather than `rglob` was the first version, and it stopped seeing
+    `shared/db/` the moment that became a package — the layering rule silently
+    covered less than it claimed to."""
+    return sorted(p for p in (BACKEND / package).rglob("*.py"))
 
 
 @pytest.mark.parametrize("path", modules_in("game"), ids=lambda p: f"game/{p.name}")
@@ -61,3 +66,26 @@ def test_every_backend_module_lives_in_one_of_the_three_packages():
     flat layout started."""
     stray = [p.name for p in BACKEND.glob("*.py")]
     assert stray == []
+
+
+def test_importing_db_registers_every_table():
+    """The guard on `shared/db/__init__`'s side-effect imports.
+
+    SQLAlchemy registers a Table with the metadata when its module is
+    imported. Alembic compares that metadata against the live database, so if
+    only half the tables have been imported when `alembic revision
+    --autogenerate` runs, the other half look like tables that exist and
+    should not — and it writes `op.drop_table` for each of them.
+
+    Deleting either import from `db/__init__` looks like tidying up an unused
+    name and silently arms a migration that drops half the schema. This is
+    what makes that impossible to do quietly."""
+    from shared import db
+
+    assert set(db.metadata.tables) == {
+        "votes",
+        "daily_questions",
+        "source_documents",
+        "source_chunks",
+        "chunk_embeddings",
+    }

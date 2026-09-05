@@ -7,7 +7,8 @@ from uuid import uuid4
 import pytest
 
 from game import cache, daily
-from shared import content, db
+from shared import content
+from shared.db import votes
 
 # --- rule #1: nothing reveals before the vote ---------------------------------
 
@@ -107,14 +108,14 @@ def test_tally_unlocks_once_the_day_closes(client, monkeypatch):
 def test_vote_is_written_to_the_durable_log(client):
     q = client.get("/api/daily").json()
     client.post("/api/daily/vote", json={"choice": q["options"][0]})
-    assert db.count_votes(q["id"]) == 1
+    assert votes.count_votes(q["id"]) == 1
 
 
 def test_durable_log_rejects_a_replayed_vote(sqlite_db):
     """The Postgres constraint holds even if Redis never saw the duplicate."""
-    assert db.record_vote("q1", "voter-a", "Support") is True
-    assert db.record_vote("q1", "voter-a", "Oppose") is False
-    assert db.count_votes("q1") == 1
+    assert votes.record_vote("q1", "voter-a", "Support") is True
+    assert votes.record_vote("q1", "voter-a", "Oppose") is False
+    assert votes.count_votes("q1") == 1
 
 
 # --- concurrency: the invariant this whole phase exists for -------------------
@@ -170,6 +171,6 @@ def test_admin_override_pins_the_days_question(sqlite_db):
     pinned = content.rotation()[-1]
     default = daily.question_for_day(day)["id"]
 
-    db.set_daily_question_id(day, pinned)
+    votes.set_daily_question_id(day, pinned)
     assert daily.question_for_day(day)["id"] == pinned
     assert pinned != default or len(content.rotation()) == 1

@@ -27,7 +27,8 @@ import re
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 
-from shared import db
+from shared.db import corpus
+from shared.db import engine as db_engine
 
 log = logging.getLogger(__name__)
 
@@ -126,17 +127,17 @@ def store_passage(
     and ignores it, and GovInfo applies its own to the volume rather than the
     contents.
     """
-    if role not in db.CHUNK_ROLES:
+    if role not in corpus.CHUNK_ROLES:
         raise ValueError(
-            f"unknown role {role!r}; expected one of {sorted(db.CHUNK_ROLES)}"
+            f"unknown role {role!r}; expected one of {sorted(corpus.CHUNK_ROLES)}"
         )
 
     digest = hashlib.sha256(passage.text.encode("utf-8")).hexdigest()
     now = datetime.now(UTC)
-    engine = db.get_engine()
+    engine = db_engine.get_engine()
     with engine.begin() as conn:
         document_id = conn.execute(
-            db.source_documents.insert().returning(db.source_documents.c.id),
+            corpus.source_documents.insert().returning(corpus.source_documents.c.id),
             {
                 "question_id": question_id,
                 "source_key": source_key,
@@ -167,7 +168,7 @@ def store_passage(
             }
             for ordinal, start, end in chunk(passage.text)
         ]
-        conn.execute(db.source_chunks.insert(), rows)
+        conn.execute(corpus.source_chunks.insert(), rows)
 
     log.info(
         "stored %s passage %s as document %d (%d chars, %d chunks)",

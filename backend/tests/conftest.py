@@ -22,6 +22,7 @@ from sqlalchemy.exc import OperationalError
 from game import cache, daily
 from game.main import app
 from shared import db
+from shared.db import engine as db_engine
 
 
 @pytest.fixture(autouse=True)
@@ -36,7 +37,7 @@ def fake_redis(monkeypatch):
 @pytest.fixture(autouse=True)
 def sqlite_db(monkeypatch, tmp_path):
     engine = create_engine(f"sqlite:///{tmp_path / 'votecracy-test.db'}", future=True)
-    monkeypatch.setattr(db, "get_engine", lambda: engine)
+    monkeypatch.setattr(db_engine, "get_engine", lambda: engine)
     db.create_all_for_tests(engine)
     yield engine
     engine.dispose()
@@ -107,6 +108,6 @@ def kill_postgres(monkeypatch):
         def boom():
             raise OperationalError("connection failed", None, Exception("down"))
 
-        monkeypatch.setattr(db, "get_engine", boom)
+        monkeypatch.setattr(db_engine, "get_engine", boom)
 
     return _kill

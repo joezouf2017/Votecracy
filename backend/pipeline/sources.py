@@ -14,7 +14,8 @@ steps later when a reveal turns out to cite nothing.
 from dataclasses import dataclass
 from datetime import date, timedelta
 
-from shared import content, db
+from shared import content
+from shared.db import corpus
 
 # How far back a question's framing material may reach. A judgement call, not
 # a fact: long enough to catch the run-up to a decision — Medicare was argued
@@ -165,7 +166,9 @@ def need_window(need: str, decision: date) -> tuple[date | None, date | None]:
         return (_years_before(decision, LOOKBACK_YEARS), decision + timedelta(days=1))
     if need == "framing":
         return (_years_before(decision, LOOKBACK_YEARS), decision)
-    raise ValueError(f"unknown need {need!r}; expected one of {sorted(db.CHUNK_ROLES)}")
+    raise ValueError(
+        f"unknown need {need!r}; expected one of {sorted(corpus.CHUNK_ROLES)}"
+    )
 
 
 def _overlaps(source: Source, window: tuple[date | None, date | None]) -> bool:
@@ -191,9 +194,9 @@ def select_sources(question: dict, need: str) -> tuple[Source, ...]:
     Never returns empty — see NoSourceAvailable. An empty tuple would read to a
     caller as "nothing matched this time" and the run would carry on.
     """
-    if need not in db.CHUNK_ROLES:
+    if need not in corpus.CHUNK_ROLES:
         raise ValueError(
-            f"unknown need {need!r}; expected one of {sorted(db.CHUNK_ROLES)}"
+            f"unknown need {need!r}; expected one of {sorted(corpus.CHUNK_ROLES)}"
         )
 
     decision = date.fromisoformat(question["decision_date"])

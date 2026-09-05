@@ -29,7 +29,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from game import cache
 from game.identity import get_voter_id
 from game.models import DailyQuestion, DailyResults, VoteRequest
-from shared import content, db
+from shared import content
+from shared.db import votes
 
 log = logging.getLogger(__name__)
 
@@ -56,7 +57,7 @@ def question_for_day(day: date) -> dict:
     """
     question_id = None
     try:
-        question_id = db.get_daily_question_id(day)
+        question_id = votes.get_daily_question_id(day)
     except SQLAlchemyError:
         # Serving yesterday's rotation beats serving a 500. The admin override
         # is a nice-to-have; having a question at all is not.
@@ -113,7 +114,7 @@ def voter_choice(question_id: str, voter_id: str) -> str | None:
         )
 
     try:
-        return db.get_voter_choice(question_id, voter_id)
+        return votes.get_voter_choice(question_id, voter_id)
     except SQLAlchemyError:
         # Both stores down. Claiming "not voted" is the safe answer: it shows
         # the vote screen rather than a reveal, so rule #1 still holds.
@@ -135,7 +136,7 @@ def community_tally(question_id: str) -> dict[str, int] | None:
     the fallback if Postgres is the store that's unreachable.
     """
     try:
-        tally = db.tally(question_id)
+        tally = votes.tally(question_id)
     except SQLAlchemyError:
         log.warning(
             "postgres unavailable, serving tally from the redis cache", exc_info=True
@@ -164,7 +165,7 @@ def persist_vote(question_id: str, voter_id: str, choice: str) -> None:
     having lost its voter markers. This log line is the only place that shows up.
     """
     try:
-        if not db.record_vote(question_id, voter_id, choice):
+        if not votes.record_vote(question_id, voter_id, choice):
             log.error(
                 "durable log rejected a duplicate for voter %s on %s — redis and "
                 "postgres disagree; the cache may have lost its voter markers",

@@ -15,7 +15,8 @@ from datetime import date
 import pytest
 
 from pipeline import sources
-from shared import content, db
+from shared import content
+from shared.db import corpus
 
 # Every question x need cell. A tuple of source keys, or RAISE.
 #
@@ -82,7 +83,9 @@ def test_source_routing_matrix(cell, expected):
 
 def test_matrix_covers_every_question_and_need():
     """Otherwise a new question silently has no routing spec at all."""
-    expected = {(q["id"], n) for q in content.all_questions() for n in db.CHUNK_ROLES}
+    expected = {
+        (q["id"], n) for q in content.all_questions() for n in corpus.CHUNK_ROLES
+    }
     assert set(MATRIX) == expected
 
 
@@ -90,7 +93,7 @@ def test_matrix_covers_every_question_and_need():
 
 
 @pytest.mark.parametrize("question", content.all_questions(), ids=lambda q: q["id"])
-@pytest.mark.parametrize("need", db.CHUNK_ROLES)
+@pytest.mark.parametrize("need", corpus.CHUNK_ROLES)
 def test_select_sources_is_never_empty(question, need):
     """Two outcomes only: a non-empty tuple, or NoSourceAvailable.
 
@@ -204,7 +207,7 @@ def test_whitelist_uses_the_shared_vocabularies(source):
     vote_type has to be one questions.json can actually contain. Two copies of
     either would drift, and the drift would look like a routing gap."""
     for need, vote_type in source.serves:
-        assert need in db.CHUNK_ROLES
+        assert need in corpus.CHUNK_ROLES
         assert vote_type in content.VOTE_TYPES
 
 
