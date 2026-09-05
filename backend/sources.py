@@ -177,11 +177,13 @@ def _overlaps(source: Source, window: tuple[date | None, date | None]) -> bool:
     after all — when it stops dead in 1963 and can supply nothing.
     """
     w_start, w_end = window
-    if w_end is not None and source.coverage_start >= w_end:
-        return False
-    if source.coverage_end is not None and w_start is not None and source.coverage_end < w_start:
-        return False
-    return True
+    starts_after_window = w_end is not None and source.coverage_start >= w_end
+    ends_before_window = (
+        source.coverage_end is not None
+        and w_start is not None
+        and source.coverage_end < w_start
+    )
+    return not (starts_after_window or ends_before_window)
 
 
 def select_sources(question: dict, need: str) -> tuple[Source, ...]:
@@ -191,7 +193,9 @@ def select_sources(question: dict, need: str) -> tuple[Source, ...]:
     caller as "nothing matched this time" and the run would carry on.
     """
     if need not in db.CHUNK_ROLES:
-        raise ValueError(f"unknown need {need!r}; expected one of {sorted(db.CHUNK_ROLES)}")
+        raise ValueError(
+            f"unknown need {need!r}; expected one of {sorted(db.CHUNK_ROLES)}"
+        )
 
     decision = date.fromisoformat(question["decision_date"])
     window = need_window(need, decision)
@@ -201,10 +205,15 @@ def select_sources(question: dict, need: str) -> tuple[Source, ...]:
     chosen: list[Source] = []
     rejected: dict[str, str] = {}
     for source in WHITELIST:
-        if source.jurisdictions is not None and jurisdiction not in source.jurisdictions:
+        if (
+            source.jurisdictions is not None
+            and jurisdiction not in source.jurisdictions
+        ):
             rejected[source.key] = f"does not cover jurisdiction {jurisdiction}"
         elif (need, vote_type) not in source.serves:
-            rejected[source.key] = f"does not serve need={need} for vote_type={vote_type}"
+            rejected[source.key] = (
+                f"does not serve need={need} for vote_type={vote_type}"
+            )
         elif not _overlaps(source, window):
             rejected[source.key] = (
                 f"coverage {source.coverage_start}..{source.coverage_end or 'present'} "

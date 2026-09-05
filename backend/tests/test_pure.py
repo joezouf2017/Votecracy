@@ -172,37 +172,70 @@ def test_decision_date_is_none_for_an_unknown_question():
     assert content.decision_date("does-not-exist") is None
 
 
+# A question that passes validation. Each case below breaks exactly one thing,
+# so a failure names the check that fired rather than whichever one happens to
+# run first — the trap as the required set grows.
+VALID_METADATA = {
+    "id": "q1",
+    "jurisdiction": "US",
+    "vote_type": "congressional_passage",
+    "decision_date": "1965-04-08",
+    "retrieval": {
+        "bill_number": "H.R. 6675",
+        "congress": 89,
+        "search_terms": ["Medicare"],
+    },
+}
+
+
+def test_validate_accepts_the_baseline_the_other_cases_break():
+    content._validate(dict(VALID_METADATA))
+
+
 @pytest.mark.parametrize(
-    "broken",
+    ("change", "message"),
     [
-        {},  # no metadata at all
-        {"jurisdiction": "US", "vote_type": "congressional_passage"},  # no date
-        {"jurisdiction": "US", "decision_date": "1965-04-08"},  # no vote_type
-        {"vote_type": "congressional_passage", "decision_date": "1965-04-08"},
-        {
-            **{"jurisdiction": "US", "decision_date": "1965-04-08"},
-            "vote_type": "referendum",
-        },
-        {**{"jurisdiction": "US", "vote_type": "agency_rule"}, "decision_date": "1965"},
-        {
-            **{"jurisdiction": "US", "vote_type": "agency_rule"},
-            "decision_date": "not a date",
-        },
-        {
-            **{"jurisdiction": "US", "vote_type": "agency_rule"},
-            "decision_date": "1965-13-40",
-        },
-        {
-            **{"jurisdiction": "", "vote_type": "agency_rule"},
-            "decision_date": "1965-04-08",
-        },
+        ({"jurisdiction": None}, "jurisdiction"),
+        ({"jurisdiction": ""}, "jurisdiction"),
+        ({"vote_type": None}, "vote_type"),
+        ({"vote_type": "referendum"}, "unknown vote_type"),
+        ({"decision_date": None}, "decision_date"),
+        ({"decision_date": "1965"}, "unparseable decision_date"),
+        ({"decision_date": "not a date"}, "unparseable decision_date"),
+        ({"decision_date": "1965-13-40"}, "unparseable decision_date"),
+        ({"retrieval": None}, "missing its 'retrieval' block"),
+        ({"retrieval": []}, "missing its 'retrieval' block"),
+        ({"retrieval": {"search_terms": []}}, "search_terms"),
+        ({"retrieval": {"search_terms": "Medicare"}}, "search_terms"),
+        ({"retrieval": {"search_terms": [""]}}, "search_terms"),
+        (
+            {"retrieval": {"search_terms": ["ok"], "congress": "89"}},
+            "non-integer congress",
+        ),
     ],
 )
-def test_validate_rejects_unusable_pipeline_metadata(broken):
+def test_validate_rejects_unusable_pipeline_metadata(change, message):
     """Runs on import, so this is what stops the process rather than letting a
     question with no retrieval boundary reach the pipeline."""
-    with pytest.raises(ValueError):
-        content._validate({"id": "q1", **broken})
+    with pytest.raises(ValueError, match=message):
+        content._validate({**VALID_METADATA, **change})
+
+
+def test_validate_allows_a_question_with_no_bill_number():
+    """A UK bill and an agency rule have no congressional identifiers, so
+    requiring them would push someone into inventing one."""
+    content._validate(
+        {
+            **VALID_METADATA,
+            "jurisdiction": "UK",
+            "vote_type": "parliamentary_division",
+            "retrieval": {
+                "bill_number": None,
+                "congress": None,
+                "search_terms": ["National Health Service Bill"],
+            },
+        }
+    )
 
 
 def test_validate_accepts_what_the_dataset_actually_contains():

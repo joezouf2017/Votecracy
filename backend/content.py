@@ -62,6 +62,25 @@ def _validate(q: dict) -> None:
             f"{q['decision_date']!r}: {exc}"
         ) from exc
 
+    # `retrieval` is what `formulate_query` addresses a source with. Only
+    # search_terms is required: `bill_number` and `congress` are congressional
+    # concepts that a UK bill and an agency rule genuinely do not have, and
+    # inventing a value for them would be worse than leaving them null.
+    retrieval = q.get("retrieval")
+    if not isinstance(retrieval, dict):
+        raise ValueError(f"question {qid!r} is missing its 'retrieval' block")
+    terms = retrieval.get("search_terms")
+    if (
+        not isinstance(terms, list)
+        or not terms
+        or not all(isinstance(t, str) and t for t in terms)
+    ):
+        raise ValueError(f"question {qid!r} needs a non-empty list of search_terms")
+    if retrieval.get("congress") is not None and not isinstance(
+        retrieval["congress"], int
+    ):
+        raise ValueError(f"question {qid!r} has a non-integer congress")
+
 
 with open(_DATA_PATH, encoding="utf-8") as f:
     _questions: list[dict] = json.load(f)

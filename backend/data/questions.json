@@ -6,6 +6,11 @@
     "jurisdiction": "US",
     "vote_type": "congressional_passage",
     "decision_date": "1965-04-08",
+    "retrieval": {
+      "bill_number": "H.R. 6675",
+      "congress": 89,
+      "search_terms": ["Medicare", "hospital insurance for the aged", "King-Anderson bill"]
+    },
     "prompt": "It's 1965. Congress is debating Medicare — federal health insurance for Americans over 65. Opponents warn it's socialism; supporters say millions of seniors can't afford care. Do you vote for it?",
     "options": ["Support", "Oppose"],
     "reveal": {
@@ -21,6 +26,11 @@
     "jurisdiction": "US",
     "vote_type": "constitutional_ratification",
     "decision_date": "1919-01-16",
+    "retrieval": {
+      "bill_number": "S.J.Res. 17",
+      "congress": 65,
+      "search_terms": ["national prohibition amendment", "eighteenth amendment", "intoxicating liquors"]
+    },
     "prompt": "It's 1919. Prohibition advocates say alcohol is destroying families and fueling crime. The 18th Amendment would ban alcohol nationwide. Do you support ratification?",
     "options": ["Support", "Oppose"],
     "reveal": {
@@ -36,6 +46,11 @@
     "jurisdiction": "US",
     "vote_type": "congressional_passage",
     "decision_date": "1956-04-27",
+    "retrieval": {
+      "bill_number": "H.R. 10660",
+      "congress": 84,
+      "search_terms": ["federal aid highway", "national system of interstate and defense highways", "highway trust fund"]
+    },
     "prompt": "It's 1956. President Eisenhower proposes a $25 billion federal highway system — the largest public works project in US history. Critics say it's too expensive and a federal overreach. Do you support the Federal Aid Highway Act?",
     "options": ["Support", "Oppose"],
     "reveal": {
@@ -51,6 +66,11 @@
     "jurisdiction": "US",
     "vote_type": "congressional_passage",
     "decision_date": "1970-06-10",
+    "retrieval": {
+      "bill_number": "H.R. 17255",
+      "congress": 91,
+      "search_terms": ["clean air amendments", "air quality standards", "motor vehicle emission standards"]
+    },
     "prompt": "It's 1970. American cities choke with smog; the Cuyahoga River caught fire the year before. The Clean Air Act would give the federal government power to set emission limits on cars and factories. Industry groups warn it will destroy jobs. Do you support it?",
     "options": ["Support", "Oppose"],
     "reveal": {
@@ -66,6 +86,11 @@
     "jurisdiction": "US",
     "vote_type": "agency_rule",
     "decision_date": "2015-02-26",
+    "retrieval": {
+      "bill_number": null,
+      "congress": null,
+      "search_terms": ["net neutrality", "open internet order", "GN Docket No. 14-28", "Title II broadband reclassification"]
+    },
     "prompt": "It's 2015. The FCC is debating Net Neutrality — rules preventing internet providers from slowing specific websites or charging extra for 'fast lanes.' Telecom companies say it will kill investment; advocates say it protects a free internet. Do you support it?",
     "options": ["Support", "Oppose"],
     "reveal": {
@@ -81,6 +106,11 @@
     "jurisdiction": "US",
     "vote_type": "congressional_passage",
     "decision_date": "2010-03-21",
+    "retrieval": {
+      "bill_number": "H.R. 3590",
+      "congress": 111,
+      "search_terms": ["affordable care act", "health insurance exchange", "individual mandate"]
+    },
     "prompt": "It's 2010. The Affordable Care Act would expand Medicaid, require insurers to cover pre-existing conditions, and mandate most Americans buy health insurance. Supporters say 30 million uninsured will gain coverage; opponents call it unconstitutional government overreach. Do you support it?",
     "options": ["Support", "Oppose"],
     "reveal": {
@@ -96,6 +126,11 @@
     "jurisdiction": "US",
     "vote_type": "constitutional_ratification",
     "decision_date": "1913-02-03",
+    "retrieval": {
+      "bill_number": "S.J.Res. 40",
+      "congress": 61,
+      "search_terms": ["income tax amendment", "sixteenth amendment", "taxes on incomes"]
+    },
     "prompt": "It's 1913. Congress is debating the 16th Amendment, which would allow a permanent federal income tax. The initial rate would be just 1% on income above $3,000 (about $90,000 today). Opponents warn rates will inevitably rise. Do you support ratification?",
     "options": ["Support", "Oppose"],
     "reveal": {
@@ -111,6 +146,11 @@
     "jurisdiction": "UK",
     "vote_type": "parliamentary_division",
     "decision_date": "1946-05-02",
+    "retrieval": {
+      "bill_number": null,
+      "congress": null,
+      "search_terms": ["National Health Service Bill", "national health service", "Bevan"]
+    },
     "prompt": "It's 1946 in postwar Britain. The Labour government proposes the National Health Service — free healthcare for every citizen, funded by taxes. Doctors warn it will destroy medicine. Supporters say no one should die for lack of money. Do you vote for it?",
     "options": ["Support", "Oppose"],
     "reveal": {

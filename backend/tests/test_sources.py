@@ -9,6 +9,7 @@ coverage window, and the matrix says precisely which questions changed. A test
 that recomputed the answer from the whitelist would agree with any bug.
 """
 
+import contextlib
 from datetime import date
 
 import pytest
@@ -67,7 +68,9 @@ MATRIX = {
 }
 
 
-@pytest.mark.parametrize(("cell", "expected"), sorted(MATRIX.items()), ids=lambda v: str(v))
+@pytest.mark.parametrize(
+    ("cell", "expected"), sorted(MATRIX.items()), ids=lambda v: str(v)
+)
 def test_source_routing_matrix(cell, expected):
     question_id, need = cell
     question = content.get_question(question_id)
@@ -95,14 +98,12 @@ def test_select_sources_is_never_empty(question, need):
     An empty tuple is the dangerous third one — a caller reads it as "nothing
     matched this run" and carries on building a question with no grounding.
     """
-    try:
+    with contextlib.suppress(sources.NoSourceAvailable):
         assert sources.select_sources(question, need)
-    except sources.NoSourceAvailable:
-        pass
 
 
 def test_no_source_available_says_why_each_candidate_lost():
-    """"No UK source at all" and "no source for ratification votes" are
+    """ "No UK source at all" and "no source for ratification votes" are
     different gaps. An exception that only says "none" hides the difference."""
     question = content.get_question("uk-national-health-service-1946")
     with pytest.raises(sources.NoSourceAvailable) as exc:
@@ -149,7 +150,9 @@ def test_lookback_survives_a_leap_day():
 def test_unknown_need_is_rejected_by_both_entry_points():
     for call in (
         lambda: sources.need_window("spoiler", date(1965, 4, 8)),
-        lambda: sources.select_sources(content.get_question("us-medicare-1965"), "spoiler"),
+        lambda: sources.select_sources(
+            content.get_question("us-medicare-1965"), "spoiler"
+        ),
     ):
         with pytest.raises(ValueError, match="unknown need"):
             call()
