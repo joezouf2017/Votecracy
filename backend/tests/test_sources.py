@@ -285,8 +285,9 @@ def test_framing_queries_never_ask_for_material_from_the_decision_onwards(
     the cache even if the chunk filter later hid it — and the fetch cache is
     where a mistake persists."""
     query = sources.formulate_query(question, source, "framing")
-    ceiling = query.get("published_to") or query.get("end_date")
-    assert ceiling is not None
+    ceiling = query.get("published_to")
+    if ceiling is None:  # loc.gov takes a `dates=FROM/TO` range instead
+        ceiling = date.fromisoformat(query["dates"].split("/")[1])
     assert ceiling < date.fromisoformat(question["decision_date"])
 
 
@@ -297,8 +298,7 @@ def test_query_dates_are_clamped_to_what_the_source_holds():
     question = content.get_question("us-clean-air-act-1970")
     loc = next(s for s in sources.WHITELIST if s.key == "loc:chronicling-america")
     query = sources.formulate_query(question, loc, "framing")
-    assert query["end_date"] == date(1963, 12, 31)
-    assert query["start_date"] == date(1960, 6, 10)
+    assert query["dates"] == "1960-06-10/1963-12-31"
 
 
 def test_govinfo_query_carries_the_collection_not_the_site():

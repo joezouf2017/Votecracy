@@ -299,6 +299,17 @@ def formulate_query(question: dict, source: Source, need: str) -> dict:
             "published_to": end,
         }
     if source.key == "loc:chronicling-america":
-        return {"q": terms, "start_date": start, "end_date": end, "fo": "json"}
+        # `dates=FROM/TO`, not start_date/end_date. loc.gov accepts the latter,
+        # returns HTTP 200, and **silently ignores them**: asking for
+        # 1909-01-16..1919-01-15 came back with pages from 1933, 1926 and 1930 —
+        # 31,560 matches instead of 75. For the Prohibition question that means
+        # a 1933 article about repeal filed as pre-vote framing for "do you
+        # support ratification?", which is rule #1 failing in the quietest
+        # possible way.
+        #
+        # The fetch layer must still check `published_date` on every returned
+        # record. A parameter the API accepts is not a parameter the API honours,
+        # and only the response can settle it.
+        return {"q": terms, "dates": f"{start}/{end}", "fo": "json"}
 
     raise ValueError(f"no query shape defined for source {source.key!r}")
