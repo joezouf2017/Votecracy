@@ -45,19 +45,55 @@ To wipe all local state:
 docker compose down -v
 ```
 
-## Tests
+## Developing
+
+Running the game needs only Docker and Node — the backend's Python lives in the
+container. A local Python environment is for the things that run on the host:
+the test suite and Alembic.
+
+```bash
+python -m venv .venv
+```
+
+```bash
+source .venv/Scripts/activate      # Windows, Git Bash
+.venv\Scripts\Activate.ps1          # Windows, PowerShell
+source .venv/bin/activate           # macOS / Linux
+```
 
 ```bash
 pip install -r backend/requirements.txt
-python -m pytest backend -q        # 74 backend tests
+```
+
+## Tests
+
+```bash
+python -m pytest backend -q        # 81 backend tests, venv active
 
 cd frontend && npm test            # 21 frontend tests
 ```
 
-Both run on the host in seconds, no containers needed. Redis and Postgres are
+Both run on the host in seconds, with no containers. Redis and Postgres are
 replaced by in-process stand-ins — including two tests that drive the vote path
 under a thread pool and assert that N concurrent voters produce exactly N
 counted votes.
+
+Tests build the schema from the SQLAlchemy metadata rather than replaying the
+migration chain, which is what keeps them container-free. The tradeoff is that
+a model change without a matching migration passes here and fails on deploy;
+`alembic check` against a live database is what catches it.
+
+## Migrations
+
+```bash
+cd backend
+alembic revision --autogenerate -m "what changed"
+alembic upgrade head
+alembic check                      # models vs live database: any drift?
+```
+
+Needs the venv active and Postgres up. The container applies migrations itself
+before starting the app, so this is only for authoring them.
 
 ## Load testing
 
