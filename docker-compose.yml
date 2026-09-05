@@ -6,6 +6,8 @@ services:
     environment:
       - DATABASE_URL=postgresql://votecracy:votecracy@postgres:5432/votecracy
       - REDIS_URL=redis://redis:6379/0
+      # Comma-separated. Change this if the frontend moves off Vite's port.
+      - CORS_ORIGINS=http://localhost:5173
     depends_on:
       - postgres
       - redis
