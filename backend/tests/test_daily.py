@@ -12,11 +12,6 @@ import daily
 import db
 
 
-def voter_headers(voter_id: str | None = None) -> dict[str, str]:
-    """Impersonate a specific anonymous player."""
-    return {"Cookie": f"votecracy_voter={voter_id or uuid4().hex}"}
-
-
 # --- rule #1: nothing reveals before the vote ---------------------------------
 
 

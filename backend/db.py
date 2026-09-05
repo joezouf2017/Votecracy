@@ -27,6 +27,7 @@ from sqlalchemy import (
     Table,
     UniqueConstraint,
     create_engine,
+    func,
     select,
 )
 from sqlalchemy.exc import IntegrityError
@@ -94,9 +95,39 @@ def record_vote(question_id: str, voter_id: str, choice: str) -> bool:
 
 def count_votes(question_id: str) -> int:
     """Durable vote count — the number the Redis tally is checked against."""
-    stmt = select(votes.c.id).where(votes.c.question_id == question_id)
+    stmt = select(func.count()).select_from(votes).where(votes.c.question_id == question_id)
     with get_engine().connect() as conn:
-        return len(conn.execute(stmt).fetchall())
+        return conn.execute(stmt).scalar_one()
+
+
+def get_voter_choice(question_id: str, voter_id: str) -> str | None:
+    """What this voter picked, straight from the durable log.
+
+    The slow-but-authoritative answer to the question Redis normally answers
+    in one hop. Only used when Redis is unavailable.
+    """
+    stmt = select(votes.c.choice).where(
+        votes.c.question_id == question_id, votes.c.voter_id == voter_id
+    )
+    with get_engine().connect() as conn:
+        row = conn.execute(stmt).first()
+    return row[0] if row else None
+
+
+def tally(question_id: str) -> dict[str, int]:
+    """Rebuild the tally from the durable log.
+
+    Redis holds the same numbers and answers in O(1), but this is where they
+    can always be recovered from — the tally is a cache of this query, not a
+    separate source of truth.
+    """
+    stmt = (
+        select(votes.c.choice, func.count())
+        .where(votes.c.question_id == question_id)
+        .group_by(votes.c.choice)
+    )
+    with get_engine().connect() as conn:
+        return {choice: count for choice, count in conn.execute(stmt)}
 
 
 def get_daily_question_id(day: date) -> str | None:

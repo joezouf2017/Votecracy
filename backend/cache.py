@@ -38,6 +38,10 @@ VOTER_MARKER_TTL_SECONDS = 60 * 60 * 24 * 30
 
 DUPLICATE_VOTE = -1
 
+# Re-exported so callers can handle "Redis is gone" without importing redis
+# themselves — the degradation policy lives in daily.py, the dependency here.
+CacheUnavailable = redis.RedisError
+
 
 @lru_cache(maxsize=1)
 def get_redis() -> redis.Redis:
