@@ -11,6 +11,9 @@ testpaths = ["backend"]
 [tool.ruff]
 line-length = 88
 target-version = "py312"
+# backend/ is the import root, so isort groups content/daily/db/settings as
+# first-party instead of interleaving them with fastapi and sqlalchemy.
+src = ["backend"]
 # Alembic writes these; formatting them means fighting the generator on every
 # autogenerate. They are reviewed by hand instead.
 extend-exclude = ["backend/alembic/versions"]

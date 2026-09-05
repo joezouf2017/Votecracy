@@ -22,6 +22,7 @@ import re
 from uuid import uuid4
 
 from fastapi import Request, Response
+
 from settings import get_settings
 
 COOKIE_NAME = "votecracy_voter"

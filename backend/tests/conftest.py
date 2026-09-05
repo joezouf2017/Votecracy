@@ -12,16 +12,17 @@ suite runs with `pytest` and no containers:
 
 from datetime import UTC, date, datetime
 
-import cache
-import daily
-import db
 import fakeredis
 import pytest
 import redis
 from fastapi.testclient import TestClient
-from main import app
 from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
+
+import cache
+import daily
+import db
+from main import app
 
 
 @pytest.fixture(autouse=True)

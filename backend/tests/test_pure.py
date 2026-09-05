@@ -19,10 +19,11 @@ import re
 from datetime import UTC, date, datetime
 from uuid import uuid4
 
+import pytest
+
 import content
 import daily
 import identity
-import pytest
 import settings
 from identity import ANON_PREFIX
 
@@ -283,7 +284,13 @@ def _settings(monkeypatch, **env):
     Constructed directly rather than through get_settings(), which is cached
     for the life of the process.
     """
-    for key in ("DATABASE_URL", "REDIS_URL", "CORS_ORIGINS", "COOKIE_SECURE"):
+    for key in (
+        "DATABASE_URL",
+        "REDIS_URL",
+        "CORS_ORIGINS",
+        "COOKIE_SECURE",
+        "LOG_LEVEL",
+    ):
         monkeypatch.delenv(key, raising=False)
     for key, value in env.items():
         monkeypatch.setenv(key, value)
@@ -325,3 +332,14 @@ def test_defaults_need_no_environment_at_all(monkeypatch):
     assert s.cookie_secure is False
     assert s.redis_url.startswith("redis://")
     assert s.database_url.startswith("postgresql+psycopg://")
+
+
+def test_log_level_is_validated_not_silently_ignored(monkeypatch):
+    """A typo here used to be undetectable. dictConfig accepts a bad level
+    string and then the root logger silently keeps its previous one."""
+    with pytest.raises(ValueError, match="log_level must be one of"):
+        _settings(monkeypatch, LOG_LEVEL="verbose")
+
+
+def test_log_level_is_normalised_to_upper_case(monkeypatch):
+    assert _settings(monkeypatch, LOG_LEVEL="debug").log_level == "DEBUG"

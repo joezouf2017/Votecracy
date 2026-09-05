@@ -44,6 +44,18 @@ class Settings(BaseSettings):
         default=False,
         description="Off for local http. Must be on wherever the site is https.",
     )
+    log_level: str = Field(
+        default="INFO",
+        description="Root logger level. DEBUG, INFO, WARNING, ERROR.",
+    )
+
+    @field_validator("log_level")
+    @classmethod
+    def _known_level(cls, level: str) -> str:
+        valid = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+        if level.upper() not in valid:
+            raise ValueError(f"log_level must be one of {sorted(valid)}, got {level!r}")
+        return level.upper()
 
     @property
     def cors_origin_list(self) -> list[str]:

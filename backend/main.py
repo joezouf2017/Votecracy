@@ -1,12 +1,19 @@
 import logging
 import random
 
-import content
-from daily import router as daily_router
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+
+import content
+from daily import router as daily_router
+from logging_config import configure_logging
 from models import QuestionSummary, RevealData, VoteRequest
 from settings import get_settings
+
+# Before anything else logs. uvicorn leaves the root logger unconfigured, so
+# without this the application's records reach stderr through
+# logging.lastResort: no level, no timestamp, and nothing below WARNING at all.
+configure_logging()
 
 log = logging.getLogger(__name__)
 

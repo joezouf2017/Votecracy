@@ -19,7 +19,6 @@ metadata (and so the Alembic chain) but nothing on the vote path reads them.
 from datetime import UTC, date, datetime
 from functools import lru_cache
 
-from settings import get_settings
 from sqlalchemy import (
     Column,
     Date,
@@ -40,6 +39,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.types import TypeDecorator
+
+from settings import get_settings
 
 metadata = MetaData()
 

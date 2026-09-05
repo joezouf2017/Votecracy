@@ -23,13 +23,14 @@ Degradation policy when Redis is unavailable:
 import logging
 from datetime import UTC, date, datetime, time, timedelta
 
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from sqlalchemy.exc import SQLAlchemyError
+
 import cache
 import content
 import db
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from identity import get_voter_id
 from models import DailyQuestion, DailyResults, VoteRequest
-from sqlalchemy.exc import SQLAlchemyError
 
 log = logging.getLogger(__name__)
 

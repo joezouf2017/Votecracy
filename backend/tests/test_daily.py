@@ -4,11 +4,12 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from uuid import uuid4
 
+import pytest
+
 import cache
 import content
 import daily
 import db
-import pytest
 
 # --- rule #1: nothing reveals before the vote ---------------------------------
 

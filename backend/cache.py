@@ -15,6 +15,7 @@ they run as one Lua script, which Redis executes atomically.
 from functools import lru_cache
 
 import redis
+
 from settings import get_settings
 
 # KEYS[1] = voted:{question_id}:{voter_id}   ARGV[1] = choice
