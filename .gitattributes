@@ -1,0 +1,16 @@
+# Normalise text files to LF in the repository *and* in the working tree.
+#
+# Not cosmetic. Without this the repo was 34 CRLF files and 20 LF ones, mixed
+# within the same directory, so a six-line edit to requirements.txt showed up
+# as +25/-19 and `git blame` pointed at whoever last touched the file rather
+# than the line. Worse, loadtest/run.sh had CRLF, which makes its shebang
+# `#!/usr/bin/env bash\r` — on Linux env then looks for a program named
+# "bash\r" and the script dies with a misleading "can't execute 'bash'".
+# Verified in a container: identical script, \r stripped, runs fine.
+#
+# eol=lf rather than plain text=auto: this repo's shell scripts run inside
+# Linux containers, and the working tree is what gets bind-mounted into them.
+* text=auto eol=lf
+
+*.png binary
+*.ico binary
