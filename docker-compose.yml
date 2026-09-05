@@ -21,7 +21,12 @@ services:
       - ./backend:/app
 
   postgres:
-    image: postgres:16-alpine
+    # pgvector/pgvector, not plain postgres: Phase 3 stores embeddings in the
+    # same instance rather than standing up a separate vector DB. The image is
+    # stock Postgres 16 with the extension available; the migration enables it.
+    # Note it's Debian-based where postgres:16-alpine was not, so switching
+    # needs `docker compose down -v` — the old data volume isn't reusable.
+    image: pgvector/pgvector:pg16
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U votecracy -d votecracy"]
       interval: 2s
