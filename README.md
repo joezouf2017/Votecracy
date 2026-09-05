@@ -68,7 +68,7 @@ pip install -r backend/requirements.txt
 ## Tests
 
 ```bash
-python -m pytest backend -q        # 81 backend tests, venv active
+python -m pytest backend -q        # 120 backend tests, venv active
 
 cd frontend && npm test            # 21 frontend tests
 ```
