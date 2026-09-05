@@ -1,0 +1,32 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://votecracy:votecracy@postgres:5432/votecracy
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./backend:/app
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=votecracy
+      - POSTGRES_PASSWORD=votecracy
+      - POSTGRES_DB=votecracy
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  pgdata:
