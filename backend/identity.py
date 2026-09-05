@@ -1,4 +1,4 @@
-"""Anonymous voter identity.
+"""Voter identity.
 
 The whole identity layer for Phase 2 is one httpOnly cookie holding a random
 UUID. No accounts, no login — a player should be able to vote in one tap.
@@ -8,8 +8,14 @@ it stops the accidental double-vote (refresh, back button, two tabs) and the
 casual one, but a determined player can clear cookies or open a private window
 and vote again. Real vote integrity needs real accounts; that's a later phase.
 Putting the id in an httpOnly cookie rather than localStorage at least keeps
-page scripts from reading or rewriting it, and leaves the seam where an
-authenticated user id would slot in.
+page scripts from reading or rewriting it.
+
+Ids are prefixed by kind — `anon:8f3a...` today, `user:...` once accounts
+exist. The prefix is here now, before there is any data to migrate, because
+adding it later means rewriting `voter_id` on every historical vote and every
+Redis key. It costs nothing today and buys three things: the validator can
+accept both forms without ambiguity, Redis keys stay self-describing, and a
+query can tell an anonymous vote from an authenticated one without a join.
 """
 
 import os
@@ -23,7 +29,13 @@ COOKIE_NAME = "votecracy_voter"
 # Chrome caps cookie lifetime at 400 days; asking for more just gets clamped.
 COOKIE_MAX_AGE_SECONDS = 400 * 24 * 60 * 60
 
-_VOTER_ID_RE = re.compile(r"\A[0-9a-f]{32}\Z")
+ANON_PREFIX = "anon:"
+
+# kind -> what the part after the colon must look like. Accounts add
+# `"user": <pattern>` here and nothing else in this module changes.
+_ID_PATTERNS = {
+    "anon": re.compile(r"\A[0-9a-f]{32}\Z"),
+}
 
 
 def _valid(voter_id: str | None) -> bool:
@@ -33,7 +45,9 @@ def _valid(voter_id: str | None) -> bool:
     Redis key, so an unvalidated cookie lets anyone write arbitrary-length keys
     into Redis.
     """
-    return bool(voter_id) and bool(_VOTER_ID_RE.match(voter_id))
+    kind, separator, rest = (voter_id or "").partition(":")
+    pattern = _ID_PATTERNS.get(kind)
+    return bool(separator and pattern and pattern.match(rest))
 
 
 def get_voter_id(request: Request, response: Response) -> str:
@@ -42,7 +56,7 @@ def get_voter_id(request: Request, response: Response) -> str:
     if _valid(voter_id):
         return voter_id
 
-    voter_id = uuid4().hex
+    voter_id = f"{ANON_PREFIX}{uuid4().hex}"
     response.set_cookie(
         COOKIE_NAME,
         voter_id,

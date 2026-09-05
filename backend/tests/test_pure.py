@@ -17,6 +17,7 @@ import pytest
 import content
 import daily
 import identity
+from identity import ANON_PREFIX
 
 # --- daily.tally_available_at / tally_is_unlocked -----------------------------
 #
@@ -126,7 +127,7 @@ def test_rotation_covers_every_question_exactly_once():
 
 
 def test_valid_accepts_an_id_we_issued():
-    assert identity._valid(uuid4().hex) is True
+    assert identity._valid(f"{ANON_PREFIX}{uuid4().hex}") is True
 
 
 @pytest.mark.parametrize(
@@ -134,12 +135,18 @@ def test_valid_accepts_an_id_we_issued():
     [
         None,
         "",
-        "0" * 31,  # too short
-        "0" * 33,  # too long
-        "A" * 32,  # uppercase — uuid4().hex is lowercase
-        "g" * 32,  # right length, not hex
-        "0123456789abcdef-0123456789abcd",  # a dash sneaks in
-        "0" * 32 + "\n" + "0" * 32,  # newline: \Z anchors, $ would not have
+        "0" * 32,  # right shape, but no kind prefix
+        "user:" + "0" * 32,  # a kind we do not issue yet
+        ANON_PREFIX + "0" * 31,  # too short
+        ANON_PREFIX + "0" * 33,  # too long
+        ANON_PREFIX + "A" * 32,  # uppercase — uuid4().hex is lowercase
+        ANON_PREFIX + "g" * 32,  # right length, not hex
+        ANON_PREFIX + "0123456789abcdef-0123456789abcd",  # a dash sneaks in
+        # A *trailing* newline is what `$` lets through: it matches at the end
+        # of a string or just before a final newline, so `^...$` would accept
+        # this and let a stray byte into a Redis key. `\A...\Z` does not.
+        ANON_PREFIX + "0" * 32 + "\n",
+        ANON_PREFIX + "0" * 32 + "\n" + "0" * 32,  # newline mid-string
         "x" * 5000,
     ],
 )
@@ -151,4 +158,4 @@ def test_validator_accepts_what_the_issuer_produces():
     """Ties the two halves together. Swapping `uuid4().hex` for `str(uuid4())`
     would add dashes and the validator would start rejecting every id it just
     handed out — an outage no test above would catch."""
-    assert all(identity._valid(uuid4().hex) for _ in range(200))
+    assert all(identity._valid(f"{ANON_PREFIX}{uuid4().hex}") for _ in range(200))

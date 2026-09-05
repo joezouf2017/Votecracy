@@ -12,18 +12,22 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-from identity import COOKIE_NAME
+from identity import ANON_PREFIX, COOKIE_NAME
 from main import app
 
-VOTER_ID = re.compile(r"\A[0-9a-f]{32}\Z")
+VOTER_ID = re.compile(r"\Aanon:[0-9a-f]{32}\Z")
 
 # Anything that isn't exactly 32 lowercase hex chars. Uppercase is in here on
 # purpose: `uuid4().hex` is lowercase, so an uppercase id is not one we issued.
 MALFORMED = [
     "not-hex-at-all",
-    "A" * 32,
-    "0" * 31,
-    "0" * 33,
+    # The unprefixed form issued before ids carried a kind. Rejected on
+    # purpose: an id whose kind cannot be read is one we cannot route.
+    "0123456789abcdef0123456789abcdef",
+    "user:0123456789abcdef0123456789abcdef",  # a kind we do not issue yet
+    ANON_PREFIX + "A" * 32,
+    ANON_PREFIX + "0" * 31,
+    ANON_PREFIX + "0" * 33,
     "x" * 2000,
     "'; FLUSHALL; --",
 ]
@@ -55,7 +59,8 @@ def test_malformed_cookie_never_reaches_redis(fake_redis, malformed):
     assert len(keys) == 1
     # The vote was counted under a freshly issued id, not the supplied one.
     assert malformed not in keys[0]
-    assert VOTER_ID.match(keys[0].rsplit(":", 1)[1])
+    # voted:<question>:<kind>:<id> — the voter id is the last two segments
+    assert VOTER_ID.match(keys[0].split(":", 2)[2])
 
 
 @pytest.mark.parametrize("malformed", MALFORMED)
@@ -66,7 +71,7 @@ def test_malformed_cookie_is_replaced_with_a_valid_one(malformed):
 
 
 def test_valid_cookie_is_used_as_given(fake_redis):
-    voter_id = uuid4().hex
+    voter_id = f"{ANON_PREFIX}{uuid4().hex}"
     choice = todays_options()[0]
 
     r = act_as(voter_id, "post", "/api/daily/vote", json={"choice": choice})
@@ -76,7 +81,7 @@ def test_valid_cookie_is_used_as_given(fake_redis):
 
 def test_valid_cookie_is_not_reissued():
     """A returning player keeps their id — otherwise every visit is a new voter."""
-    r = act_as(uuid4().hex, "get", "/api/daily")
+    r = act_as(f"{ANON_PREFIX}{uuid4().hex}", "get", "/api/daily")
     assert COOKIE_NAME not in r.cookies
 
 
