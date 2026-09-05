@@ -182,6 +182,43 @@ cannot separate an amendment's *description* from its *vote counts* when both
 sit in the same Congressional Record page on the same day — the description is
 legitimate pre-vote material, the margin gives the result away.
 
+### The predicate has exactly one implementation
+
+`pipeline/retrieval.py` owns it, and everything that needs scoped material goes
+through there. The rule was written in three places in prose before it was
+written in one place in code, and the two functions that enforce it both took
+the scope from their caller as plain text — which means both failed *open*:
+
+- `spoilers.forbidden(reveal, pre_vote_text)` is a set difference. Assemble its
+  pre-vote half without `AND role = 'framing'` and it does not error; it returns
+  a smaller forbidden set, possibly empty, and an empty set reads exactly like a
+  clean generation.
+- `grounding.verify(claim, document_text)` never resolved the `document_id` the
+  claim carries. Hand it the wrong document and it returns `Verdict(True)`
+  whenever the cited number happens to appear in it.
+
+So the module resolves documents itself and refuses in two more places. `Scope`
+is an enum, not a string, because the failure being prevented is a stale literal
+picking the wrong half of the corpus and looking like an ordinary empty result.
+An unknown `question_id` raises for the same reason: "no such question" and
+"this question has no material yet" are the same empty list, and only one of
+them is safe to carry on from.
+
+Two functions rather than one, and the split is the point. `scope_text` builds
+material from **chunks**; `document_text` returns a whole **document** for
+checking a citation against its source. A document straddles `role` — that is
+the case `role` exists for — so it can legitimately contain the margins that
+`scope_text` must never emit. Collapsing them would leak a vote count into the
+very set that defines what a leaked vote count is.
+
+One consequence worth knowing before the generator is written: a chunk is 1000
+characters and `grounding.MAX_SPAN_CHARS` is 600, so **a whole chunk is not a
+valid citation** — 192 of the Medicare slice's 218 chunks are too long. Both
+numbers are right, because a retrieval unit and a piece of evidence are
+different things, but it means the prompt has to ask for a span *within* the
+chunk it supplied. `test_retrieval.py` pins the relationship so that changing
+either constant surfaces the requirement.
+
 ### Sources are chosen by coverage, and refused loudly
 
 `select_sources(question, need)` returns every whitelisted source that can serve

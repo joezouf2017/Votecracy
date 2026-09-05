@@ -166,6 +166,7 @@ backend/
     sources.py    which source can answer which need, and how to ask it
     ingest.py     normalise, extract, chunk, store
     embedding.py  chunks to vectors
+    retrieval.py  rule #1: the pre/post-vote boundary, as the only query
     grounding.py  rule #2: a claim's span citation, checked by code
     spoilers.py   rule #1: what the reveal says that the sources never did
   shared/
