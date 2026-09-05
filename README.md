@@ -121,7 +121,18 @@ it after a restart.
 
 [**docs/architecture.md**](docs/architecture.md) covers this properly: the
 atomic vote path, what happens when Redis is unreachable versus merely empty,
-the anonymous identity model and its limits, and the testing strategy.
+the anonymous identity model and its limits, the package layout and the import
+rule that enforces it, and the testing strategy.
+
+The rest of `docs/` is the reasoning behind the content side:
+
+| | |
+|---|---|
+| [`candidate-generation.md`](docs/candidate-generation.md) | where questions come from, and why the generator must not see the margin |
+| [`content-audit.md`](docs/content-audit.md) | how each question's `decision_date` was established, and three errors it turned up |
+| [`evaluation.md`](docs/evaluation.md) | how the no-spoiler, grounding and neutrality rules get measured rather than asserted |
+| [`engineering-practices.md`](docs/engineering-practices.md) | what the tooling audit changed, and what it deliberately left alone |
+| [`spike-source-retrieval.md`](docs/spike-source-retrieval.md), [`spike-fetch-reality.md`](docs/spike-fetch-reality.md) | what the source APIs actually do, measured against them |
 
 ## Stack
 
@@ -165,7 +176,7 @@ backend/
   tests/
 frontend/src/     pages, components, api layer, tests
 loadtest/         k6 script and the verification runner
-docs/             architecture, source spikes, content audit, metrics
+docs/             architecture, design decisions, source spikes, metrics
 ```
 
 ## License
