@@ -1,0 +1,7 @@
+# Bulk reformatting commits. `git blame` skips these with:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# Line-ending normalisation is deliberately absent — the index was already
+# LF throughout, so that change produced no content diff and damaged nothing.
+
+# Add ruff and apply it
+a5da7129bcf2bd5b28209a164a18c8ca997df956
