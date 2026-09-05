@@ -1,0 +1,13 @@
+# Development and CI only. The runtime image installs requirements.txt and
+# gets none of this — 6.8 MB of it was shipping before the split, and the
+# file already had a "Test-only" heading that nothing enforced.
+-r requirements.txt
+
+# fakeredis runs the real Lua script against an in-process Redis, so the
+# concurrency tests exercise atomicity without a container. lupa is its Lua
+# runtime and the largest single item here.
+pytest==8.3.3
+httpx==0.27.2
+fakeredis[lua]==2.24.1
+
+ruff==0.7.4

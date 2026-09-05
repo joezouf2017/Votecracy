@@ -62,8 +62,11 @@ source .venv/bin/activate           # macOS / Linux
 ```
 
 ```bash
-pip install -r backend/requirements.txt
+pip install -r backend/requirements-dev.txt
 ```
+
+`requirements.txt` is the runtime set that the container installs;
+`requirements-dev.txt` adds it plus the test and lint tools.
 
 ## Tests
 
