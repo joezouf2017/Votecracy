@@ -14,13 +14,23 @@ environment at all.
 """
 
 from functools import lru_cache
+from pathlib import Path
 
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Anchored to this file, not to the working directory. A bare `env_file=".env"`
+# is resolved against cwd, and this project has three: the container starts in
+# /app, pytest runs from the repo root, alembic runs from backend/. The failure
+# mode is the whole reason this module exists — the file silently does not load
+# and every key reads as empty, with nothing in the logs saying so.
+_HERE = Path(__file__).resolve().parent
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=(_HERE.parent / ".env", _HERE / ".env"), extra="ignore"
+    )
 
     database_url: str = Field(
         default="postgresql+psycopg://votecracy:votecracy@localhost:5432/votecracy",
@@ -47,6 +57,24 @@ class Settings(BaseSettings):
     log_level: str = Field(
         default="INFO",
         description="Root logger level. DEBUG, INFO, WARNING, ERROR.",
+    )
+
+    # Phase 3 content pipeline. Both default to empty so the app, the tests and
+    # `docker compose up` all work without a key — nothing on the vote path
+    # reads them, and the pipeline is the only caller that should fail loudly
+    # when one is missing.
+    #
+    # SecretStr, not str: it prints as `**********`, so a key cannot reach the
+    # logs through a stray repr of Settings. Read it with
+    # `.get_secret_value()` at the point of use, which also makes every place
+    # that touches the raw value greppable.
+    govinfo_api_key: SecretStr = Field(
+        default=SecretStr(""),
+        description="api.data.gov key for GovInfo. Free from api.data.gov/signup.",
+    )
+    gemini_api_key: SecretStr = Field(
+        default=SecretStr(""),
+        description="Google AI Studio key. Offline pipeline only, never the vote path.",
     )
 
     @field_validator("log_level")

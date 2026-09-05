@@ -21,3 +21,9 @@ Thumbs.db
 # Bulk source corpora, cached locally. Voteview alone is 29 MB, it is
 # reproducible from one URL, and nothing in the repo should carry it.
 backend/.cache/
+
+# Secrets. settings.py reads .env, so without this the first person to create
+# one commits their API keys. .env.example carries the shape, never the values.
+.env
+.env.*
+!.env.example

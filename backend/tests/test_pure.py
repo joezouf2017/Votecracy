@@ -376,3 +376,23 @@ def test_log_level_is_validated_not_silently_ignored(monkeypatch):
 
 def test_log_level_is_normalised_to_upper_case(monkeypatch):
     assert _settings(monkeypatch, LOG_LEVEL="debug").log_level == "DEBUG"
+
+
+# --- the API keys -------------------------------------------------------------
+
+
+def test_api_keys_default_to_empty_so_nothing_needs_one_to_run(monkeypatch):
+    """The vote path never reads them, and the container, the suite and
+    `docker compose up` all have to work on a machine with no keys at all."""
+    s = _settings(monkeypatch)
+    assert s.govinfo_api_key.get_secret_value() == ""
+    assert s.gemini_api_key.get_secret_value() == ""
+
+
+def test_an_api_key_cannot_reach_the_logs_through_a_repr(monkeypatch):
+    """SecretStr, not str. Settings gets logged, printed in tracebacks and
+    dumped by debuggers; a plain string would ride along in all three."""
+    s = _settings(monkeypatch, GOVINFO_API_KEY="sk-not-a-real-key-000")
+    assert "sk-not-a-real-key-000" not in repr(s)
+    assert "sk-not-a-real-key-000" not in str(s.govinfo_api_key)
+    assert s.govinfo_api_key.get_secret_value() == "sk-not-a-real-key-000"
