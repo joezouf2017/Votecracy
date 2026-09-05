@@ -17,3 +17,7 @@ CLAUDE.md
 # OS
 .DS_Store
 Thumbs.db
+
+# Bulk source corpora, cached locally. Voteview alone is 29 MB, it is
+# reproducible from one URL, and nothing in the repo should carry it.
+backend/.cache/
