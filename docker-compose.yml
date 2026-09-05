@@ -25,8 +25,17 @@ services:
 
   redis:
     image: redis:7-alpine
+    # AOF, not the default RDB-only. RDB snapshots on graceful shutdown and on
+    # the `save` windows, so a hard crash can lose everything written since the
+    # last one — up to an hour under light load. appendfsync everysec caps the
+    # loss at roughly a second of votes. The named volume matters as much as
+    # the flag: without it the append log dies with the container.
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
     ports:
       - "6379:6379"
+    volumes:
+      - redisdata:/data
 
 volumes:
   pgdata:
+  redisdata:

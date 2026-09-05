@@ -37,9 +37,15 @@ log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/daily", tags=["daily"])
 
 
+def now() -> datetime:
+    """The clock, in one place. Every time-dependent branch reads it, so tests
+    can move time instead of waiting for it."""
+    return datetime.now(timezone.utc)
+
+
 def today() -> date:
     """UTC, not server-local — the day boundary has to be the same for everyone."""
-    return datetime.now(timezone.utc).date()
+    return now().date()
 
 
 def question_for_day(day: date) -> dict:
@@ -72,13 +78,24 @@ def tally_available_at(day: date) -> datetime:
 def voter_choice(question_id: str, voter_id: str) -> str | None:
     """What this voter picked — Redis first, Postgres as the fallback.
 
-    Redis answers this in one hop and is the normal path. When it's gone we
-    fall back to the durable log rather than telling a player who already
-    voted that they haven't: Postgres is the source of truth, Redis is the
-    accelerator in front of it.
+    Redis answers this in one hop and is the normal path. Two ways it can stop
+    being trustworthy, and both fall through to the durable log:
+
+    - unreachable — raises, obvious
+    - alive but empty after a restart — returns None, *not* obvious. An empty
+      cache can't distinguish "never voted" from "marker lost", so a bare None
+      isn't enough to conclude the player hasn't voted.
+
+    That's why a None is retried against Postgres and not just an exception.
+    The cost is one indexed lookup per page load for players who genuinely
+    haven't voted yet; `GET /api/daily` is once per player per day, so this
+    isn't the hot path — casting the vote is, and that still never touches
+    Postgres synchronously.
     """
     try:
-        return cache.previous_choice(question_id, voter_id)
+        cached = cache.previous_choice(question_id, voter_id)
+        if cached is not None:
+            return cached
     except cache.CacheUnavailable:
         log.warning("redis unavailable, reading voter choice from postgres", exc_info=True)
 
@@ -92,22 +109,65 @@ def voter_choice(question_id: str, voter_id: str) -> str | None:
 
 
 def community_tally(question_id: str) -> dict[str, int] | None:
-    """The vote split — Redis first, rebuilt from the durable log if it's gone."""
+    """The vote split — read from the durable log, then cached in Redis.
+
+    Postgres first, deliberately, even though Redis holds the same numbers and
+    answers faster. A Redis that came back empty doesn't error; it answers
+    *plausibly wrong*, and a tally that silently undercounts is worse than a
+    slow one. This number is only read once the day has closed, so one GROUP BY
+    over an indexed column is a fine price for it always being right.
+
+    Redis stays in the picture as the cache: the answer is written back so
+    repeat views of the same closed day don't re-run the query, and it's still
+    the fallback if Postgres is the store that's unreachable.
+    """
     try:
-        return cache.get_tally(question_id)
-    except cache.CacheUnavailable:
-        log.warning("redis unavailable, rebuilding tally from postgres", exc_info=True)
+        tally = db.tally(question_id)
+    except SQLAlchemyError:
+        log.warning("postgres unavailable, serving tally from the redis cache", exc_info=True)
+        try:
+            return cache.get_tally(question_id)
+        except cache.CacheUnavailable:
+            log.error("both redis and postgres unavailable for tally", exc_info=True)
+            return None
 
     try:
-        return db.tally(question_id)
+        cache.store_tally(question_id, tally)
+    except cache.CacheUnavailable:
+        log.warning("could not refresh the cached tally", exc_info=True)
+
+    return tally
+
+
+def persist_vote(question_id: str, voter_id: str, choice: str) -> None:
+    """Background task: append the vote to the durable log.
+
+    Failures are swallowed — the vote is already counted and the response is
+    already sent, so there is nothing left to raise into. But they must not be
+    swallowed *silently*: the durable log rejecting a duplicate means Redis and
+    Postgres disagree about who has voted, which is the signature of the cache
+    having lost its voter markers. This log line is the only place that shows up.
+    """
+    try:
+        if not db.record_vote(question_id, voter_id, choice):
+            log.error(
+                "durable log rejected a duplicate for voter %s on %s — redis and "
+                "postgres disagree; the cache may have lost its voter markers",
+                voter_id,
+                question_id,
+            )
     except SQLAlchemyError:
-        log.error("both redis and postgres unavailable for tally", exc_info=True)
-        return None
+        log.error(
+            "durable write failed for voter %s on %s; the vote is counted in redis only",
+            voter_id,
+            question_id,
+            exc_info=True,
+        )
 
 
 def _results(question: dict, day: date, your_choice: str) -> DailyResults:
     unlocks_at = tally_available_at(day)
-    available = datetime.now(timezone.utc) >= unlocks_at
+    available = now() >= unlocks_at
 
     tally = community_tally(question["id"]) if available else None
     # Don't claim the tally is available while handing back nothing.
@@ -171,7 +231,7 @@ def vote_daily(
         )
 
     # Counted in Redis, so the player's vote is safe. Persist after responding.
-    background.add_task(db.record_vote, question["id"], voter_id, body.choice)
+    background.add_task(persist_vote, question["id"], voter_id, body.choice)
 
     return _results(question, day, body.choice)
 

@@ -92,3 +92,22 @@ def previous_choice(question_id: str, voter_id: str) -> str | None:
 def get_tally(question_id: str) -> dict[str, int]:
     raw = get_redis().hgetall(tally_key(question_id))
     return {choice: int(count) for choice, count in raw.items()}
+
+
+def store_tally(question_id: str, tally: dict[str, int]) -> None:
+    """Overwrite the cached tally with authoritative numbers from Postgres.
+
+    Delete-then-write in one transaction, not a plain HSET: HSET only adds and
+    updates fields, so a stale option left over from a previous value would
+    survive the refresh.
+
+    Only safe because this is called for *closed* days, whose vote count can
+    no longer change — every vote is cast against `today()`. Overwriting a
+    live tally would race with in-flight HINCRBYs.
+    """
+    key = tally_key(question_id)
+    pipe = get_redis().pipeline(transaction=True)
+    pipe.delete(key)
+    if tally:
+        pipe.hset(key, mapping=tally)
+    pipe.execute()

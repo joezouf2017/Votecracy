@@ -1,7 +1,7 @@
 """Daily mode: the vote → reveal flow under a shared, concurrent tally."""
 
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date, timedelta
+from datetime import date, datetime, timezone
 from uuid import uuid4
 
 import pytest
@@ -78,16 +78,28 @@ def test_results_available_after_voting(client):
 
 
 def test_tally_unlocks_once_the_day_closes(client, monkeypatch):
-    """A closed day shows the community split; an open one doesn't."""
-    closed_day = date.today() - timedelta(days=2)
-    monkeypatch.setattr(daily, "today", lambda: closed_day)
+    """The real sequence: vote while the day is open, see the split after it closes.
+
+    Written as a transition rather than two separate states because a vote can
+    only ever be cast against `today()` — an already-closed day receiving a
+    vote is a situation production can't produce.
+    """
+    day = date(2026, 3, 14)
+    monkeypatch.setattr(daily, "today", lambda: day)
+    monkeypatch.setattr(daily, "now", lambda: datetime(2026, 3, 14, 12, tzinfo=timezone.utc))
 
     q = client.get("/api/daily").json()
-    body = client.post("/api/daily/vote", json={"choice": q["options"][0]}).json()
+    during = client.post("/api/daily/vote", json={"choice": q["options"][0]}).json()
+    assert during["tally_available"] is False
+    assert during["tally"] is None
 
-    assert body["tally_available"] is True
-    assert body["tally"] == {q["options"][0]: 1}
-    assert body["total_votes"] == 1
+    # Midnight UTC passes and the vote closes.
+    monkeypatch.setattr(daily, "now", lambda: datetime(2026, 3, 15, 0, 1, tzinfo=timezone.utc))
+
+    after = client.get("/api/daily/results").json()
+    assert after["tally_available"] is True
+    assert after["tally"] == {q["options"][0]: 1}
+    assert after["total_votes"] == 1
 
 
 # --- durability ---------------------------------------------------------------
