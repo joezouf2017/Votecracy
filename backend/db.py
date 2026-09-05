@@ -16,10 +16,10 @@ Phase 3 adds the content pipeline's source tables further down. They share this
 metadata (and so the Alembic chain) but nothing on the vote path reads them.
 """
 
-import os
 from datetime import UTC, date, datetime
 from functools import lru_cache
 
+from settings import get_settings
 from sqlalchemy import (
     Column,
     Date,
@@ -231,10 +231,7 @@ chunk_embeddings = Table(
 @lru_cache(maxsize=1)
 def get_engine():
     """Lazily build the engine so importing this module doesn't need a server."""
-    url = os.environ.get(
-        "DATABASE_URL",
-        "postgresql+psycopg://votecracy:votecracy@localhost:5432/votecracy",
-    )
+    url = get_settings().database_url
     # SQLAlchemy needs the driver spelled out; compose supplies a bare
     # postgresql:// URL, so normalise it rather than duplicating config.
     if url.startswith("postgresql://"):

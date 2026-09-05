@@ -23,6 +23,7 @@ import content
 import daily
 import identity
 import pytest
+import settings
 from identity import ANON_PREFIX
 
 # --- daily.tally_available_at / tally_is_unlocked -----------------------------
@@ -263,3 +264,64 @@ def test_validator_accepts_what_the_issuer_produces():
     would add dashes and the validator would start rejecting every id it just
     handed out — an outage no test above would catch."""
     assert all(identity._valid(f"{ANON_PREFIX}{uuid4().hex}") for _ in range(200))
+
+
+# --- settings ---------------------------------------------------------------
+#
+# Parsing only, no I/O, so these belong in the solitary layer. They exist
+# because the first version of Settings declared cors_origins as `list[str]`,
+# which pydantic-settings JSON-decodes before any validator runs — so the
+# value docker-compose actually sets, `CORS_ORIGINS=http://localhost:5173`,
+# crashed the process at startup. Nothing in the suite set that variable, so
+# all 120 tests passed against a backend that could not boot in its own
+# container.
+
+
+def _settings(monkeypatch, **env):
+    """A Settings built from a controlled environment.
+
+    Constructed directly rather than through get_settings(), which is cached
+    for the life of the process.
+    """
+    for key in ("DATABASE_URL", "REDIS_URL", "CORS_ORIGINS", "COOKIE_SECURE"):
+        monkeypatch.delenv(key, raising=False)
+    for key, value in env.items():
+        monkeypatch.setenv(key, value)
+    return settings.Settings(_env_file=None)
+
+
+def test_cors_origins_parses_the_value_compose_actually_sets(monkeypatch):
+    s = _settings(monkeypatch, CORS_ORIGINS="http://localhost:5173")
+    assert s.cors_origin_list == ["http://localhost:5173"]
+
+
+def test_cors_origins_splits_and_strips_a_comma_separated_list(monkeypatch):
+    s = _settings(monkeypatch, CORS_ORIGINS="https://a.example,  https://b.example ,")
+    assert s.cors_origin_list == ["https://a.example", "https://b.example"]
+
+
+def test_bare_postgres_url_gains_the_psycopg_driver(monkeypatch):
+    """compose supplies `postgresql://`; SQLAlchemy needs the driver named."""
+    s = _settings(monkeypatch, DATABASE_URL="postgresql://u:p@h:5432/d")
+    assert s.database_url == "postgresql+psycopg://u:p@h:5432/d"
+
+
+def test_an_explicit_driver_is_left_alone(monkeypatch):
+    url = "postgresql+psycopg://u:p@h:5432/d"
+    assert _settings(monkeypatch, DATABASE_URL=url).database_url == url
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    [("true", True), ("True", True), ("1", True), ("false", False), ("0", False)],
+)
+def test_cookie_secure_reads_as_a_boolean(monkeypatch, value, expected):
+    assert _settings(monkeypatch, COOKIE_SECURE=value).cookie_secure is expected
+
+
+def test_defaults_need_no_environment_at_all(monkeypatch):
+    s = _settings(monkeypatch)
+    assert s.cors_origin_list == ["http://localhost:5173"]
+    assert s.cookie_secure is False
+    assert s.redis_url.startswith("redis://")
+    assert s.database_url.startswith("postgresql+psycopg://")

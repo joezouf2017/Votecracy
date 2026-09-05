@@ -18,11 +18,11 @@ accept both forms without ambiguity, Redis keys stay self-describing, and a
 query can tell an anonymous vote from an authenticated one without a join.
 """
 
-import os
 import re
 from uuid import uuid4
 
 from fastapi import Request, Response
+from settings import get_settings
 
 COOKIE_NAME = "votecracy_voter"
 
@@ -64,6 +64,6 @@ def get_voter_id(request: Request, response: Response) -> str:
         httponly=True,
         samesite="lax",
         # Off for local http dev; on everywhere else.
-        secure=os.environ.get("COOKIE_SECURE", "false").lower() == "true",
+        secure=get_settings().cookie_secure,
     )
     return voter_id

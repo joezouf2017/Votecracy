@@ -1,5 +1,4 @@
 import logging
-import os
 import random
 
 import content
@@ -7,6 +6,7 @@ from daily import router as daily_router
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from models import QuestionSummary, RevealData, VoteRequest
+from settings import get_settings
 
 log = logging.getLogger(__name__)
 
@@ -17,19 +17,9 @@ log = logging.getLogger(__name__)
 # a table it thinks it still has to create.
 app = FastAPI(title="Votecracy API", version="0.2.0")
 
-# Comma-separated, so swapping the frontend for one on a different port is a
-# config change rather than a code change. Getting this wrong surfaces as an
-# opaque "blocked by CORS policy" error in the browser rather than anything
-# that points at the origin list, so it is worth keeping easy to fix.
-_cors_origins = [
-    origin.strip()
-    for origin in os.environ.get("CORS_ORIGINS", "http://localhost:5173").split(",")
-    if origin.strip()
-]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_cors_origins,
+    allow_origins=get_settings().cors_origin_list,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
     # Daily mode identifies voters with an httpOnly cookie, which the browser

@@ -12,10 +12,10 @@ die between them, marking the voter as done without counting their vote. So
 they run as one Lua script, which Redis executes atomically.
 """
 
-import os
 from functools import lru_cache
 
 import redis
+from settings import get_settings
 
 # KEYS[1] = voted:{question_id}:{voter_id}   ARGV[1] = choice
 # KEYS[2] = tally:{question_id}              ARGV[2] = ttl seconds for the marker
@@ -46,8 +46,7 @@ CacheUnavailable = redis.RedisError
 @lru_cache(maxsize=1)
 def get_redis() -> redis.Redis:
     """Lazily build the client so importing this module doesn't need a server."""
-    url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
-    return redis.Redis.from_url(url, decode_responses=True)
+    return redis.Redis.from_url(get_settings().redis_url, decode_responses=True)
 
 
 def voter_key(question_id: str, voter_id: str) -> str:

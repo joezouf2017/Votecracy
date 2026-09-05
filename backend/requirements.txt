@@ -16,3 +16,10 @@ alembic==1.13.3
 # Postgres instance as everything else rather than in a separate vector DB —
 # one thing to run, back up and migrate.
 pgvector==0.3.6
+
+# pydantic-settings: one typed, validated place for every environment
+# variable. Read individually with os.environ.get, a misspelled name
+# silently falls back to the default — CORS_ORIGIN instead of
+# CORS_ORIGINS would break every request in production with nothing in
+# the logs to say why.
+pydantic-settings==2.6.1
