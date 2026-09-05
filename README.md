@@ -28,8 +28,9 @@ Requires Docker and Node 18+.
 docker compose up --build
 ```
 
-Brings up the backend on `:8000`, Postgres on `:5432` and Redis on `:6379`, and
-creates the database schema on startup. Then the frontend:
+Brings up the backend on `:8000`, Postgres on `:5432` and Redis on `:6379`. The
+container runs `alembic upgrade head` before starting the app, so the schema is
+migrated on boot. Then the frontend:
 
 ```bash
 cd frontend && npm install && npm run dev

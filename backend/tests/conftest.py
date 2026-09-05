@@ -38,7 +38,7 @@ def fake_redis(monkeypatch):
 def sqlite_db(monkeypatch, tmp_path):
     engine = create_engine(f"sqlite:///{tmp_path / 'votecracy-test.db'}", future=True)
     monkeypatch.setattr(db, "get_engine", lambda: engine)
-    db.metadata.create_all(engine)
+    db.create_all_for_tests(engine)
     yield engine
     engine.dispose()
 

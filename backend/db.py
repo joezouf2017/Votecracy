@@ -68,8 +68,19 @@ def get_engine():
     return create_engine(url, pool_pre_ping=True, future=True)
 
 
-def init_db() -> None:
-    metadata.create_all(get_engine())
+def create_all_for_tests(engine) -> None:
+    """Build the schema straight from the metadata, for tests only.
+
+    Production schema is owned by Alembic (`alembic upgrade head`, run by the
+    container before uvicorn starts). Tests deliberately skip the migration
+    chain — they want a schema in one step against a throwaway SQLite file, not
+    a replay of every historical migration.
+
+    The cost of that shortcut is that the two can drift: a model change without
+    a matching migration passes the tests and breaks deployment. `alembic check`
+    against a live database is what catches it; run it before deploying.
+    """
+    metadata.create_all(engine)
 
 
 def record_vote(question_id: str, voter_id: str, choice: str) -> bool:

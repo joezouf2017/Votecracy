@@ -1,32 +1,22 @@
 import logging
 import os
 import random
-from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.exc import SQLAlchemyError
 
 import content
-import db
 from daily import router as daily_router
 from models import QuestionSummary, RevealData, VoteRequest
 
 log = logging.getLogger(__name__)
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    try:
-        db.init_db()
-    except SQLAlchemyError:
-        # Quick mode doesn't touch Postgres, so a missing database shouldn't
-        # stop the app booting — daily mode will fail loudly on its own.
-        log.warning("could not initialise database schema", exc_info=True)
-    yield
-
-
-app = FastAPI(title="Votecracy API", version="0.2.0", lifespan=lifespan)
+# No schema creation here on purpose. Alembic owns the schema, and the
+# container runs `alembic upgrade head` before uvicorn starts. An app that also
+# creates tables would race the migration and win, leaving Alembic to fail on
+# a table it thinks it still has to create.
+app = FastAPI(title="Votecracy API", version="0.2.0")
 
 # Comma-separated, so swapping the frontend for one on a different port is a
 # config change rather than a code change. Getting this wrong surfaces as an

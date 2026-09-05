@@ -169,6 +169,34 @@ through.
 
 Results in [`metrics/`](metrics/).
 
+## Schema changes
+
+Alembic owns the production schema. `create_all()` only ever creates *missing*
+tables — it cannot add a column to a table that already exists, and it fails
+silently rather than telling you so. Anything past the first schema is beyond it.
+
+```bash
+cd backend
+alembic revision --autogenerate -m "what changed"   # writes a versioned script
+alembic upgrade head                                # applies it
+alembic check                                       # models vs live DB: any drift?
+```
+
+The container runs `alembic upgrade head` before uvicorn, so a failed migration
+stops the container rather than letting it serve against a stale schema.
+
+Tests take a shortcut: `db.create_all_for_tests()` builds the schema straight
+from the metadata against a throwaway SQLite file, skipping the migration chain
+entirely. That keeps the suite container-free and fast, at the cost of one real
+risk — a model change without a matching migration passes the tests and breaks
+deployment. `alembic check` against a live database is what catches that; run it
+before deploying.
+
+The URL is not configured in `alembic.ini`. `env.py` takes it from
+`db.get_engine()`, so the app and the migrations cannot disagree about how to
+connect — including the `postgresql://` → `postgresql+psycopg://` normalisation
+that compose's `DATABASE_URL` needs.
+
 ## Replacing the frontend
 
 The backend serves JSON and nothing else — no templates, no server-rendered

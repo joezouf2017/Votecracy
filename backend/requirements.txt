@@ -6,7 +6,10 @@ uvicorn[standard]==0.30.6
 # sqlalchemy + psycopg: durable vote log written off the request path (see db.py).
 redis==5.0.8
 sqlalchemy==2.0.35
-psycopg[binary]==3.2.3
+psycopg[binary]==3.2.3
+# alembic: create_all() only ever creates missing tables, so it cannot add a
+# column to a table that already exists. Phase 3 changes existing tables.
+alembic==1.13.3
 
 # Test-only.
 # fakeredis lets the vote-tally tests run the real Lua script against an
