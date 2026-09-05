@@ -136,19 +136,36 @@ the anonymous identity model and its limits, and the testing strategy.
 
 ## Layout
 
+The backend is split by system, not by layer. The two halves never touch: an
+offline pipeline that gathers and verifies source material, and a live game
+path that serves votes. `backend/tests/test_layering.py` parses the imports and
+fails if anything in `game/` reaches into `pipeline/` — if the vote path could
+depend on retrieval, a broken pipeline could take voting down with it.
+
 ```
 backend/
-  main.py         app wiring, quick-play endpoints
-  daily.py        daily mode — vote path and degradation policy
-  cache.py        Redis: the atomic dedupe + tally script
-  db.py           Postgres: durable vote log
-  identity.py     anonymous voter cookie
-  content.py      curated content store
-  data/           the questions
+  game/           the live vote path — never calls a model
+    main.py       app wiring, quick-play endpoints
+    daily.py      daily mode: vote path and degradation policy
+    cache.py      Redis, the atomic dedupe + tally script
+    identity.py   anonymous voter cookie
+    schemas.py    request/response shapes
+  pipeline/       the offline content pipeline — never on a request path
+    voteview.py   reads a roll-call corpus, emits question candidates
+    sources.py    which source can answer which need, and how to ask it
+    ingest.py     normalise, extract, chunk, store
+    embedding.py  chunks to vectors
+    grounding.py  rule #2: a claim's span citation, checked by code
+    spoilers.py   rule #1: what the reveal says that the sources never did
+  shared/
+    settings.py   every environment variable, in one typed place
+    content.py    the curated question store
+    db/           engine + votes (game) + corpus (pipeline)
+  alembic/        migrations own the schema
   tests/
 frontend/src/     pages, components, api layer, tests
 loadtest/         k6 script and the verification runner
-docs/             architecture notes and load-test results
+docs/             architecture, source spikes, content audit, metrics
 ```
 
 ## License

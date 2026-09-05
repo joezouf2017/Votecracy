@@ -1,3 +1,15 @@
+"""The ASGI application — wiring, plus the quick-play endpoints.
+
+Quick play is Phase 1's single-player loop and lives here because it is three
+short handlers; daily mode is its own module. What both share is that nothing
+on this path calls a language model. The content pipeline runs offline and
+writes to the store this reads; if the pipeline is broken, voting is not.
+
+Rule #1 is enforced before a response is built, not by these handlers
+remembering to: `content.public_view` whitelists the fields a player may see,
+and the response models narrow it again.
+"""
+
 import logging
 import random
 
