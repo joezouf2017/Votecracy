@@ -17,21 +17,20 @@ which is why `test_layering.py` asserts the full set is present after a bare
 
 # Imported for their side effect: registering tables on `metadata`. Not
 # re-exported — callers say which half they mean.
-from shared.db import corpus, votes  # noqa: F401  (see the module docstring)
-from shared.db.engine import (
-    EMBEDDING_DIM,
-    Vector,
-    create_all_for_tests,
-    get_engine,
-    metadata,
-)
+from shared.db import corpus, engine, votes  # noqa: F401  (see the module docstring)
+from shared.db.engine import EMBEDDING_DIM, Vector, create_all_for_tests, metadata
 
+# `get_engine` is deliberately not re-exported. `from ... import get_engine`
+# takes a snapshot of the function, so a test that replaces the engine would
+# not reach a caller holding that snapshot — which is exactly how five tests
+# silently started reading the real Postgres during the package split. Reach
+# it as `engine.get_engine()`; `test_layering` enforces this.
 __all__ = [
     "EMBEDDING_DIM",
     "Vector",
     "corpus",
     "create_all_for_tests",
-    "get_engine",
+    "engine",
     "metadata",
     "votes",
 ]

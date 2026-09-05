@@ -1,6 +1,6 @@
 """Alembic environment.
 
-The connection URL is not read from alembic.ini. It comes from `db.get_engine()`,
+The connection URL is not read from alembic.ini. It comes from `db_engine.get_engine()`,
 which is the same place the application gets it — including the
 `postgresql://` → `postgresql+psycopg://` normalisation that docker-compose's
 DATABASE_URL needs. One decision about how to connect, not two that can drift.
@@ -10,6 +10,7 @@ from logging.config import fileConfig
 
 from alembic import context
 from shared import db
+from shared.db import engine as db_engine
 
 config = context.config
 
@@ -22,7 +23,7 @@ target_metadata = db.metadata
 def run_migrations_offline() -> None:
     """Emit SQL to stdout instead of running it — `alembic upgrade head --sql`."""
     context.configure(
-        url=str(db.get_engine().url),
+        url=str(db_engine.get_engine().url),
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -33,7 +34,7 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    connectable = db.get_engine()
+    connectable = db_engine.get_engine()
 
     with connectable.connect() as connection:
         context.configure(

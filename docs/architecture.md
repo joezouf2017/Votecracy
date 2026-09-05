@@ -24,8 +24,11 @@ Nothing about the outcome may reach the client before a vote is cast. This is
 enforced server-side, in two places:
 
 - `content.public_view()` is the only function that produces the pre-vote shape
-  of a question. It returns a new dict with the `reveal` key removed, so the
-  outcome is never serialised into a pre-vote response.
+  of a question. It returns a new dict containing a **whitelist** of fields, so
+  the outcome is never serialised into a pre-vote response. It was a blacklist
+  once — strip `reveal`, pass everything else — and that failed open the moment
+  the pipeline added `decision_date`, `vote_type` and `jurisdiction` to every
+  question. A whitelist cannot leak the next field someone adds.
 - `GET /api/daily/results` returns `403` unless the caller has a recorded vote.
 
 Both have tests whose only purpose is to keep it that way, including one
@@ -37,6 +40,138 @@ The community tally is treated as part of the same rule. It stays hidden until
 the day's vote closes, because a running count would nudge later voters toward
 the leading option, and noticing the gap between your own judgment and history
 is the point of the game.
+
+## The content pipeline
+
+The larger half of the backend, and the one the live path must never touch. It
+turns a historical decision into a playable question: find candidates, work out
+which sources can answer them, fetch, normalise, chunk, embed, generate, and
+verify. Every step runs offline.
+
+```
+Voteview bulk corpus  ──►  candidates      (date, chamber, bill, margin)
+                             │
+select_sources ──────────────┤              which source, for which need
+                             ▼
+fetch ──► normalise ──► extract ──► chunk ──► embed ──► pgvector
+                                                          │
+                                        retrieve (scoped) ─┤
+                                                          ▼
+                                       generate ──► verify ──► human review
+```
+
+### The boundary is a date, not a source type
+
+The rule that shapes everything else:
+
+```
+pre-vote  = published_date <  decision_date  AND  role = 'framing'
+post-vote = published_date >= decision_date
+```
+
+Classifying whole sources as "framing" or "outcome" was the first design and it
+is wrong in both directions. A statistical series has values *before* the
+decision too — US life expectancy in 1965 is a precondition of the Medicare
+debate, not a result of it. And a newspaper retrospective printed in 1970 about
+a 1965 decision is outcome material even though newspapers are a "framing
+source". The date catches both; the type catches neither.
+
+`role` is a second filter, never an alternative one. It exists because the date
+cannot separate an amendment's *description* from its *vote counts* when both
+sit in the same Congressional Record page on the same day — the description is
+legitimate pre-vote material, the margin gives the result away.
+
+### Sources are chosen by coverage, and refused loudly
+
+`select_sources(question, need)` returns every whitelisted source that can serve
+a need, and **raises rather than returning an empty list**. Eight of the
+twenty-four (question × need) combinations raise today: Voteview is a
+congressional dataset and holds no state ratification votes, nothing covers the
+UK, and there is no FCC source at all. Those gaps are the output, not a defect
+list — an empty list would be read as "nothing matched this run", and the
+pipeline would carry on building a question with nothing behind it.
+
+Routing is on each source's real coverage window rather than the question's
+coarse `era` label, for the same reason the boundary is a date: the label is a
+proxy. Both ends of the window matter. Chronicling America starts in 1777, so
+"does it start early enough" is true for every question ever asked; its 1963 end
+is what actually decides whether it can supply anything.
+
+### An API's date filter is never the safety boundary
+
+Measured against the live services, each one fails differently:
+
+- **loc.gov** accepts `start_date`/`end_date`, returns HTTP 200, and ignores
+  them. A request for the Prohibition question's pre-vote window returned pages
+  from 1933 — the year Prohibition was repealed. The parameter it honours is
+  `dates=FROM/TO`.
+- **GovInfo** honours its filter but applies it to the *volume's* date rather
+  than the proceedings inside. The drift runs 0–23 days, and the single most
+  relevant document for the Medicare question — the House record of the day
+  before the vote — sits in a volume dated three weeks later.
+- **archive.org** puts the true span only in the item title, which parses for
+  17 of 25 items.
+
+So the fetch layer reads `published_date` off every returned record and applies
+the boundary itself. `source_documents.published_date` is NOT NULL to force
+this: a document whose date cannot be established belongs on neither side of the
+boundary, and a nullable column invites a query that treats NULL as "before".
+
+### Verification is layered, and the layers are not interchangeable
+
+Three checks, cheapest and most deterministic first.
+
+**Structural.** The generator is only ever shown `framing` chunks. A model that
+has not seen the outcome cannot leak it, which is stronger than instructing one
+not to. The candidate row carries the vote margin, so the prompt generator gets
+a whitelist projection of it — the same pattern as `public_view`, a different
+consumer.
+
+**Code, for rule #2.** Each factual sentence carries a `(document_id,
+char_span)` citation, and `grounding.verify` checks the span exists, is tight
+enough to be evidence rather than a haystack, and actually contains the value —
+"19 million", "19,000,000" and "nineteen million" being one assertion.
+`unsupported_numbers` catches the other half: a number in the prose that no
+citation vouches for. **No model is involved**, deliberately — using an LLM to
+decide whether an LLM hallucinated reintroduces exactly what the rule prevents.
+
+**A judge, for neutrality only.** The one check with no deterministic ground
+truth, and it must be a different model family from the generator: a
+same-family judge shares the generator's blind spots.
+
+Rule #1 gets a fourth, post-hoc check anyway, because "the generator could not
+have known" is an argument about the pipeline, and an argument is not a test.
+`spoilers.forbidden` is a set difference already sitting in the database:
+`tokens(reveal)` minus `tokens(pre-vote material)`. Words the reveal shares with
+the sources are not spoilers — "medicare" and "hospital" are all over the 1965
+record — and on that question 28 distinct reveal words reduce to 4. The numbers
+are the half that matters: 307 and 116, the House margin.
+
+### Storage is three layers, ordered by what it costs to lose
+
+| table | rebuilt from | cost |
+|---|---|---|
+| `source_documents` | the network only | the expensive one — never drop |
+| `source_chunks` | documents | free, locally |
+| `chunk_embeddings` | chunks | embedding API calls |
+
+Embeddings are a separate table rather than a column on chunks so that "drop the
+vectors and re-embed" is an operation you can actually perform. If dropping them
+meant re-fetching from the network, the layering would be wrong.
+
+Chunks carry `question_id` and `published_date` copied down from their parent
+document, so the pre-vote filter is one indexed predicate on the table the
+retriever actually queries. Left on the document, every retrieval needs a join —
+and the failure mode of forgetting that join is silently returning outcome
+material. The copy is held honest by a composite foreign key into
+`(id, question_id, published_date)`, so a chunk that disagrees with its document
+cannot be written at all.
+
+There is **no ANN index**, and there may never need to be one. Retrieval is
+always scoped to a single question, so a btree narrows 116,000 chunks to a few
+hundred before any vector arithmetic happens: measured at 1.8 ms, against 382 ms
+for the same search unscoped. pgvector's IVFFlat and HNSW indexes search globally
+and then filter, which for a highly selective predicate is worse, not better.
 
 ## How a vote is counted
 
