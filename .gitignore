@@ -10,8 +10,9 @@ venv/
 node_modules/
 frontend/dist/
 
-# Claude Code project context (local only)
+# Claude Code local config and project context (local only)
 CLAUDE.md
+.claude/
 
 # OS
 .DS_Store
