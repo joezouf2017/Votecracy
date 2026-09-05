@@ -1,7 +1,7 @@
 """Daily mode: the vote → reveal flow under a shared, concurrent tally."""
 
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date, datetime, timezone
+from datetime import date
 from uuid import uuid4
 
 import pytest
@@ -84,17 +84,16 @@ def test_tally_unlocks_once_the_day_closes(client, monkeypatch):
     only ever be cast against `today()` — an already-closed day receiving a
     vote is a situation production can't produce.
     """
-    day = date(2026, 3, 14)
-    monkeypatch.setattr(daily, "today", lambda: day)
-    monkeypatch.setattr(daily, "now", lambda: datetime(2026, 3, 14, 12, tzinfo=timezone.utc))
+    day = daily.today()
 
     q = client.get("/api/daily").json()
     during = client.post("/api/daily/vote", json={"choice": q["options"][0]}).json()
     assert during["tally_available"] is False
     assert during["tally"] is None
 
-    # Midnight UTC passes and the vote closes.
-    monkeypatch.setattr(daily, "now", lambda: datetime(2026, 3, 15, 0, 1, tzinfo=timezone.utc))
+    # Move to the exact unlock instant — this also drives the `>=` boundary
+    # through the real endpoint, not just the unit test.
+    monkeypatch.setattr(daily, "now", lambda: daily.tally_available_at(day))
 
     after = client.get("/api/daily/results").json()
     assert after["tally_available"] is True
@@ -152,9 +151,14 @@ def test_concurrent_duplicate_votes_let_exactly_one_through():
 # --- which question is live ---------------------------------------------------
 
 
-def test_rotation_is_deterministic_for_a_given_day():
-    day = date(2026, 3, 14)
-    assert daily.question_for_day(day)["id"] == daily.question_for_day(day)["id"]
+def test_the_rotation_actually_rotates():
+    """Guards against a rotation that always lands on the same question — e.g.
+    a hardcoded index, or a modulo against the wrong length. The "same day
+    always maps to the same question" half is covered in test_pure.py by
+    `rotation()` being sorted; asserting it here would just call one pure
+    function twice and compare it to itself."""
+    ids = {daily.question_for_day(date(2026, 3, d))["id"] for d in range(1, 15)}
+    assert len(ids) > 1
 
 
 def test_admin_override_pins_the_days_question(sqlite_db):

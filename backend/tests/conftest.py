@@ -10,10 +10,7 @@ suite runs with `pytest` and no containers:
   behaves the same on both engines.
 """
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
+from datetime import date, datetime, timezone
 
 import fakeredis
 import pytest
@@ -23,6 +20,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
 
 import cache
+import daily
 import db
 from main import app
 
@@ -43,6 +41,29 @@ def sqlite_db(monkeypatch, tmp_path):
     db.metadata.create_all(engine)
     yield engine
     engine.dispose()
+
+
+# A fixed Wednesday. The daily question is `rotation[day.toordinal() % 8]`, so
+# without pinning the date the suite exercises a different question every day
+# it runs — benign today only because all eight questions happen to have the
+# same shape.
+FROZEN_DAY = date(2026, 3, 14)
+FROZEN_NOW = datetime(2026, 3, 14, 12, 0, tzinfo=timezone.utc)
+
+
+@pytest.fixture(autouse=True)
+def frozen_clock(monkeypatch):
+    """Stop the clock at midday on FROZEN_DAY.
+
+    Both time reads are pinned, not just the date: `today()` decides which
+    question is live, `now()` decides whether the tally has unlocked. Leaving
+    `now()` real would put every test past the unlock boundary of a fixed past
+    day and quietly reveal the tally everywhere.
+
+    Tests about the day boundary re-patch `daily.now` themselves.
+    """
+    monkeypatch.setattr(daily, "today", lambda: FROZEN_DAY)
+    monkeypatch.setattr(daily, "now", lambda: FROZEN_NOW)
 
 
 @pytest.fixture

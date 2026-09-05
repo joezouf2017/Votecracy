@@ -75,6 +75,16 @@ def tally_available_at(day: date) -> datetime:
     return datetime.combine(day + timedelta(days=1), time.min, tzinfo=timezone.utc)
 
 
+def tally_is_unlocked(day: date, at: datetime) -> bool:
+    """Whether `day`'s community split may be shown at time `at`.
+
+    Pulled out of `_results` so the boundary can be tested directly. An
+    off-by-one here shows the tally an hour early — which is a spoiler, and
+    spoilers are the one thing this game can't get wrong.
+    """
+    return at >= tally_available_at(day)
+
+
 def voter_choice(question_id: str, voter_id: str) -> str | None:
     """What this voter picked — Redis first, Postgres as the fallback.
 
@@ -167,7 +177,7 @@ def persist_vote(question_id: str, voter_id: str, choice: str) -> None:
 
 def _results(question: dict, day: date, your_choice: str) -> DailyResults:
     unlocks_at = tally_available_at(day)
-    available = now() >= unlocks_at
+    available = tally_is_unlocked(day, now())
 
     tally = community_tally(question["id"]) if available else None
     # Don't claim the tally is available while handing back nothing.

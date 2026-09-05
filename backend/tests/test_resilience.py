@@ -11,7 +11,6 @@ exact count that every other test in this suite is protecting.
 """
 
 import logging
-from datetime import date, datetime, timezone
 
 import cache
 import daily
@@ -65,14 +64,12 @@ def test_reveal_still_works_when_redis_is_down(client, kill_redis):
 
 def vote_then_close_the_day(client, monkeypatch) -> dict:
     """Cast one vote while the day is open, then move the clock past midnight."""
-    day = date(2026, 3, 14)
-    monkeypatch.setattr(daily, "today", lambda: day)
-    monkeypatch.setattr(daily, "now", lambda: datetime(2026, 3, 14, 12, tzinfo=timezone.utc))
+    day = daily.today()
 
     question = client.get("/api/daily").json()
     client.post("/api/daily/vote", json={"choice": question["options"][0]})
 
-    monkeypatch.setattr(daily, "now", lambda: datetime(2026, 3, 15, 0, 1, tzinfo=timezone.utc))
+    monkeypatch.setattr(daily, "now", lambda: daily.tally_available_at(day))
     return question
 
 
