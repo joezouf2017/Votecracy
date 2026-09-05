@@ -225,3 +225,80 @@ def select_sources(question: dict, need: str) -> tuple[Source, ...]:
     if not chosen:
         raise NoSourceAvailable(question["id"], need, rejected)
     return tuple(chosen)
+
+
+# --- addressing a source ------------------------------------------------------
+
+_JOINT_RESOLUTION = (("SJRES", "SJR"), ("HJRES", "HJR"))
+
+
+def normalize_bill_number(raw: str) -> str:
+    """`S.J.Res. 17` -> `SJR17`, the spelling Voteview actually uses.
+
+    Spike finding 5. Searching Voteview for the conventional `SJRES17` returns
+    zero rows, which looks exactly like the amendment not being in the dataset
+    rather than like a formatting mismatch. A silent empty result is the worst
+    possible failure here, so the transformation gets its own function and its
+    own tests.
+    """
+    if not raw or not raw.strip():
+        raise ValueError("bill number is empty")
+    compact = "".join(ch for ch in raw.upper() if ch.isalnum())
+    for conventional, voteview in _JOINT_RESOLUTION:
+        if compact.startswith(conventional):
+            return voteview + compact[len(conventional) :]
+    return compact
+
+
+def _bounds(source: Source, window: tuple[date | None, date | None]):
+    """Turn the half-open need window into inclusive API date bounds.
+
+    Clamped to what the source actually holds, so a query never asks
+    Chronicling America for 1970 and reads the empty result as "nothing was
+    written about this".
+    """
+    w_start, w_end = window
+    start = max(w_start, source.coverage_start) if w_start else source.coverage_start
+    end = w_end - timedelta(days=1) if w_end else None  # window end is exclusive
+    if source.coverage_end and (end is None or source.coverage_end < end):
+        end = source.coverage_end
+    return start, end
+
+
+def formulate_query(question: dict, source: Source, need: str) -> dict:
+    """The request to send this source for this need. Still no network.
+
+    The date ceiling is baked into the query rather than left to a filter on
+    the way back in. For `need="framing"` it is the day before the decision, so
+    a framing fetch cannot *ask* for outcome material — the same invariant the
+    `published_date` predicate enforces on `source_chunks`, applied a step
+    earlier where an accident is cheaper.
+    """
+    decision = date.fromisoformat(question["decision_date"])
+    start, end = _bounds(source, need_window(need, decision))
+    retrieval = question["retrieval"]
+
+    if source.key == "voteview":
+        bill = retrieval.get("bill_number")
+        congress = retrieval.get("congress")
+        if not bill or not congress:
+            raise ValueError(
+                f"{question['id']!r} has no bill_number/congress, which "
+                f"{source.key} needs to identify the measure"
+            )
+        # No date bounds: Voteview is one bulk download keyed by bill, and the
+        # roll calls for a measure are the roll calls for that measure.
+        return {"congress": congress, "bill_number": normalize_bill_number(bill)}
+
+    terms = " OR ".join(f'"{t}"' for t in retrieval["search_terms"])
+    if source.key.startswith("govinfo:"):
+        return {
+            "collection": source.collection,
+            "query": terms,
+            "published_from": start,
+            "published_to": end,
+        }
+    if source.key == "loc:chronicling-america":
+        return {"q": terms, "start_date": start, "end_date": end, "fo": "json"}
+
+    raise ValueError(f"no query shape defined for source {source.key!r}")
