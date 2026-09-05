@@ -29,7 +29,7 @@ from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path
 
-from pipeline import sources
+from pipeline import queries
 
 log = logging.getLogger(__name__)
 
@@ -85,8 +85,8 @@ def _is_object_of(dtl_desc: str, verb: str, bill_number: str) -> bool:
     remainder = dtl_desc[len(verb) :].strip()
     if not remainder:
         return False
-    compact = sources.normalize_bill_number(remainder)
-    bill = sources.normalize_bill_number(bill_number)
+    compact = queries.normalize_bill_number(remainder)
+    bill = queries.normalize_bill_number(bill_number)
     if not compact.startswith(bill):
         return False
     # Stops HR172 matching the start of HR17255.
