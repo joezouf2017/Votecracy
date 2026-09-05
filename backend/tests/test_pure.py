@@ -394,3 +394,20 @@ def test_an_api_key_cannot_reach_the_logs_through_a_repr(monkeypatch):
     assert "sk-not-a-real-key-000" not in repr(s)
     assert "sk-not-a-real-key-000" not in str(s.govinfo_api_key)
     assert s.govinfo_api_key.get_secret_value() == "sk-not-a-real-key-000"
+
+
+def test_the_env_file_is_looked_for_at_the_repository_root():
+    """The package split moved settings.py one level deeper and a hardcoded
+    `parent.parent` stopped reaching the repo root — every key read as empty
+    and nothing said so. The candidate list walks upward instead.
+
+    This test finds the root by looking for pyproject.toml rather than by
+    counting directories, because counting is the mistake under test. The
+    first draft of this assertion counted, and got it wrong by one."""
+    from pathlib import Path
+
+    from shared import settings
+
+    here = Path(settings.__file__).resolve()
+    root = next(d for d in here.parents if (d / "pyproject.toml").exists())
+    assert root / ".env" in settings._ENV_FILES

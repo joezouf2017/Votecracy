@@ -5,7 +5,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from game.daily import router as daily_router
-from game.models import QuestionSummary, RevealData, VoteRequest
+from game.schemas import QuestionSummary, RevealData, VoteRequest
 from shared import content
 from shared.logging_config import configure_logging
 from shared.settings import get_settings

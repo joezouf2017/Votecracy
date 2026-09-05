@@ -19,18 +19,24 @@ from pathlib import Path
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Anchored to this file, not to the working directory. A bare `env_file=".env"`
-# is resolved against cwd, and this project has three: the container starts in
-# /app, pytest runs from the repo root, alembic runs from backend/. The failure
-# mode is the whole reason this module exists — the file silently does not load
-# and every key reads as empty, with nothing in the logs saying so.
+# Anchored to this file, and to every directory above it up to the repository
+# root. A bare `env_file=".env"` resolves against the working directory, and
+# this project has three: the container starts in /app, pytest runs from the
+# repo root, alembic from backend/. The failure mode is the whole reason this
+# module exists — the file silently does not load and every key reads empty,
+# with nothing in the logs saying so.
+#
+# The candidate list is walked rather than hardcoded to a depth because a
+# fixed `parent.parent` broke the moment this module moved from backend/ into
+# backend/shared/ during the package split. It went unnoticed until an API
+# client complained its key was missing, which is the same silent failure one
+# level up.
 _HERE = Path(__file__).resolve().parent
+_ENV_FILES = tuple(d / ".env" for d in (_HERE, *_HERE.parents))
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=(_HERE.parent / ".env", _HERE / ".env"), extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_file=_ENV_FILES, extra="ignore")
 
     database_url: str = Field(
         default="postgresql+psycopg://votecracy:votecracy@localhost:5432/votecracy",

@@ -28,7 +28,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from game import cache
 from game.identity import get_voter_id
-from game.models import DailyQuestion, DailyResults, VoteRequest
+from game.schemas import DailyQuestion, DailyResults, VoteRequest
 from shared import content
 from shared.db import votes
 

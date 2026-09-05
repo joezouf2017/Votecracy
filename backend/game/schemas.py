@@ -1,3 +1,11 @@
+"""Request and response shapes for the HTTP API.
+
+Named `schemas`, not `models`, because in SQLAlchemy — and in Django, and in
+FastAPI's own convention — "models" means the persistence layer. The real
+models are `Table` objects in `shared/db/`. Calling these that too invited
+exactly one wrong guess at a glance.
+"""
+
 from datetime import date, datetime
 
 from pydantic import BaseModel
