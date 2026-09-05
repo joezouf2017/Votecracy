@@ -16,14 +16,13 @@ time. Not worth restructuring the module to avoid, but worth naming.
 """
 
 import re
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from uuid import uuid4
-
-import pytest
 
 import content
 import daily
 import identity
+import pytest
 from identity import ANON_PREFIX
 
 # --- daily.tally_available_at / tally_is_unlocked -----------------------------
@@ -35,13 +34,13 @@ from identity import ANON_PREFIX
 
 def test_tally_unlocks_at_midnight_utc_ending_the_day():
     assert daily.tally_available_at(date(2026, 3, 14)) == datetime(
-        2026, 3, 15, 0, 0, tzinfo=timezone.utc
+        2026, 3, 15, 0, 0, tzinfo=UTC
     )
 
 
 def test_unlock_time_is_utc_aware():
     """A naive datetime here would compare-error against `now()` at runtime."""
-    assert daily.tally_available_at(date(2026, 3, 14)).tzinfo == timezone.utc
+    assert daily.tally_available_at(date(2026, 3, 14)).tzinfo == UTC
 
 
 @pytest.mark.parametrize(
@@ -60,12 +59,12 @@ def test_unlock_time_rolls_the_date_correctly(day, expected):
 @pytest.mark.parametrize(
     "at, unlocked",
     [
-        (datetime(2026, 3, 14, 0, 0, 0, tzinfo=timezone.utc), False),  # day opens
-        (datetime(2026, 3, 14, 12, 0, 0, tzinfo=timezone.utc), False),  # midday
-        (datetime(2026, 3, 14, 23, 59, 59, tzinfo=timezone.utc), False),  # last second
-        (datetime(2026, 3, 15, 0, 0, 0, tzinfo=timezone.utc), True),  # the boundary
-        (datetime(2026, 3, 15, 0, 0, 1, tzinfo=timezone.utc), True),
-        (datetime(2026, 3, 20, 0, 0, 0, tzinfo=timezone.utc), True),  # long after
+        (datetime(2026, 3, 14, 0, 0, 0, tzinfo=UTC), False),  # day opens
+        (datetime(2026, 3, 14, 12, 0, 0, tzinfo=UTC), False),  # midday
+        (datetime(2026, 3, 14, 23, 59, 59, tzinfo=UTC), False),  # last second
+        (datetime(2026, 3, 15, 0, 0, 0, tzinfo=UTC), True),  # the boundary
+        (datetime(2026, 3, 15, 0, 0, 1, tzinfo=UTC), True),
+        (datetime(2026, 3, 20, 0, 0, 0, tzinfo=UTC), True),  # long after
     ],
 )
 def test_tally_unlocks_exactly_at_the_boundary(at, unlocked):
@@ -115,9 +114,9 @@ def test_public_view_drops_fields_it_has_never_heard_of():
     """The point of the whitelist. A blacklist passes every test above and
     still leaks the next field someone adds — which is exactly what happened
     when jurisdiction/vote_type/decision_date arrived."""
-    assert content.public_view({**SAMPLE, "internal_scratch": "leak me"}) == content.public_view(
-        SAMPLE
-    )
+    assert content.public_view(
+        {**SAMPLE, "internal_scratch": "leak me"}
+    ) == content.public_view(SAMPLE)
 
 
 def test_public_view_does_not_mutate_its_input():
@@ -126,7 +125,7 @@ def test_public_view_does_not_mutate_its_input():
     for every later request — the kind of bug that only shows up on request two."""
     original = dict(SAMPLE)
     content.public_view(SAMPLE)
-    assert SAMPLE == original
+    assert original == SAMPLE
     assert "reveal" in SAMPLE
 
 
@@ -178,11 +177,23 @@ def test_decision_date_is_none_for_an_unknown_question():
         {"jurisdiction": "US", "vote_type": "congressional_passage"},  # no date
         {"jurisdiction": "US", "decision_date": "1965-04-08"},  # no vote_type
         {"vote_type": "congressional_passage", "decision_date": "1965-04-08"},
-        {**{"jurisdiction": "US", "decision_date": "1965-04-08"}, "vote_type": "referendum"},
+        {
+            **{"jurisdiction": "US", "decision_date": "1965-04-08"},
+            "vote_type": "referendum",
+        },
         {**{"jurisdiction": "US", "vote_type": "agency_rule"}, "decision_date": "1965"},
-        {**{"jurisdiction": "US", "vote_type": "agency_rule"}, "decision_date": "not a date"},
-        {**{"jurisdiction": "US", "vote_type": "agency_rule"}, "decision_date": "1965-13-40"},
-        {**{"jurisdiction": "", "vote_type": "agency_rule"}, "decision_date": "1965-04-08"},
+        {
+            **{"jurisdiction": "US", "vote_type": "agency_rule"},
+            "decision_date": "not a date",
+        },
+        {
+            **{"jurisdiction": "US", "vote_type": "agency_rule"},
+            "decision_date": "1965-13-40",
+        },
+        {
+            **{"jurisdiction": "", "vote_type": "agency_rule"},
+            "decision_date": "1965-04-08",
+        },
     ],
 )
 def test_validate_rejects_unusable_pipeline_metadata(broken):

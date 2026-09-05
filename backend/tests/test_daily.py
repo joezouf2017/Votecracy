@@ -4,13 +4,11 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from uuid import uuid4
 
-import pytest
-
 import cache
 import content
 import daily
 import db
-
+import pytest
 
 # --- rule #1: nothing reveals before the vote ---------------------------------
 
@@ -57,7 +55,10 @@ def test_vote_rejects_invalid_choice(client):
 
 def test_second_vote_from_same_player_is_rejected(client):
     q = client.get("/api/daily").json()
-    assert client.post("/api/daily/vote", json={"choice": q["options"][0]}).status_code == 200
+    assert (
+        client.post("/api/daily/vote", json={"choice": q["options"][0]}).status_code
+        == 200
+    )
 
     second = client.post("/api/daily/vote", json={"choice": q["options"][1]})
     assert second.status_code == 409
@@ -126,7 +127,9 @@ def test_concurrent_distinct_voters_are_all_counted_exactly_once(voters):
     voter_ids = [uuid4().hex for _ in range(voters)]
 
     with ThreadPoolExecutor(max_workers=16) as pool:
-        results = list(pool.map(lambda v: cache.cast_vote("q-load", v, "Support"), voter_ids))
+        results = list(
+            pool.map(lambda v: cache.cast_vote("q-load", v, "Support"), voter_ids)
+        )
 
     assert cache.DUPLICATE_VOTE not in results
     # Every call got a distinct sequence number, which is only true if no two
@@ -141,7 +144,9 @@ def test_concurrent_duplicate_votes_let_exactly_one_through():
 
     with ThreadPoolExecutor(max_workers=16) as pool:
         results = list(
-            pool.map(lambda _: cache.cast_vote("q-dupe", voter_id, "Support"), range(50))
+            pool.map(
+                lambda _: cache.cast_vote("q-dupe", voter_id, "Support"), range(50)
+            )
         )
 
     assert results.count(cache.DUPLICATE_VOTE) == 49

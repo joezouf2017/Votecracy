@@ -106,7 +106,9 @@ def test_already_voted_survives_a_redis_flush(client, fake_redis):
     fake_redis.flushall()
 
     assert client.get("/api/daily").json()["already_voted"] is True
-    assert client.get("/api/daily/results").json()["your_choice"] == question["options"][1]
+    assert (
+        client.get("/api/daily/results").json()["your_choice"] == question["options"][1]
+    )
 
 
 def test_tally_falls_back_to_the_cache_when_postgres_is_down(

@@ -10,19 +10,18 @@ suite runs with `pytest` and no containers:
   behaves the same on both engines.
 """
 
-from datetime import date, datetime, timezone
-
-import fakeredis
-import pytest
-import redis
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.exc import OperationalError
+from datetime import UTC, date, datetime
 
 import cache
 import daily
 import db
+import fakeredis
+import pytest
+import redis
+from fastapi.testclient import TestClient
 from main import app
+from sqlalchemy import create_engine
+from sqlalchemy.exc import OperationalError
 
 
 @pytest.fixture(autouse=True)
@@ -48,7 +47,7 @@ def sqlite_db(monkeypatch, tmp_path):
 # it runs — benign today only because all eight questions happen to have the
 # same shape.
 FROZEN_DAY = date(2026, 3, 14)
-FROZEN_NOW = datetime(2026, 3, 14, 12, 0, tzinfo=timezone.utc)
+FROZEN_NOW = datetime(2026, 3, 14, 12, 0, tzinfo=UTC)
 
 
 @pytest.fixture(autouse=True)
@@ -78,7 +77,9 @@ class _DeadRedis:
 
     def __getattr__(self, name):
         def boom(*args, **kwargs):
-            raise redis.ConnectionError("Error 111 connecting to redis:6379. Connection refused.")
+            raise redis.ConnectionError(
+                "Error 111 connecting to redis:6379. Connection refused."
+            )
 
         return boom
 

@@ -17,7 +17,7 @@ metadata (and so the Alembic chain) but nothing on the vote path reads them.
 """
 
 import os
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from functools import lru_cache
 
 from sqlalchemy import (
@@ -71,6 +71,7 @@ class Vector(TypeDecorator):
 
             return dialect.type_descriptor(PGVector(self.dim))
         return dialect.type_descriptor(LargeBinary())
+
 
 votes = Table(
     "votes",
@@ -134,7 +135,9 @@ source_documents = Table(
     Column("sha256", String(64), nullable=False),  # content-addressed cache key
     Column("text", Text, nullable=False),
     Column("fetched_at", DateTime(timezone=True), nullable=False),
-    UniqueConstraint("source_key", "external_id", name="uq_source_documents_source_external"),
+    UniqueConstraint(
+        "source_key", "external_id", name="uq_source_documents_source_external"
+    ),
     # Not useful on its own — it exists so source_chunks can point a composite
     # foreign key at these three columns. See the note there.
     UniqueConstraint(
@@ -195,7 +198,9 @@ source_chunks = Table(
         # chunks rather than leaving them behind on the old boundary.
         onupdate="CASCADE",
     ),
-    UniqueConstraint("document_id", "ordinal", name="uq_source_chunks_document_ordinal"),
+    UniqueConstraint(
+        "document_id", "ordinal", name="uq_source_chunks_document_ordinal"
+    ),
     Index("ix_source_chunks_question_published", "question_id", "published_date"),
 )
 
@@ -227,7 +232,8 @@ chunk_embeddings = Table(
 def get_engine():
     """Lazily build the engine so importing this module doesn't need a server."""
     url = os.environ.get(
-        "DATABASE_URL", "postgresql+psycopg://votecracy:votecracy@localhost:5432/votecracy"
+        "DATABASE_URL",
+        "postgresql+psycopg://votecracy:votecracy@localhost:5432/votecracy",
     )
     # SQLAlchemy needs the driver spelled out; compose supplies a bare
     # postgresql:// URL, so normalise it rather than duplicating config.
@@ -262,7 +268,7 @@ def record_vote(question_id: str, voter_id: str, choice: str) -> bool:
         question_id=question_id,
         voter_id=voter_id,
         choice=choice,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     try:
         with get_engine().begin() as conn:
@@ -274,7 +280,11 @@ def record_vote(question_id: str, voter_id: str, choice: str) -> bool:
 
 def count_votes(question_id: str) -> int:
     """Durable vote count — the number the Redis tally is checked against."""
-    stmt = select(func.count()).select_from(votes).where(votes.c.question_id == question_id)
+    stmt = (
+        select(func.count())
+        .select_from(votes)
+        .where(votes.c.question_id == question_id)
+    )
     with get_engine().connect() as conn:
         return conn.execute(stmt).scalar_one()
 
@@ -328,4 +338,6 @@ def set_daily_question_id(day: date, question_id: str) -> None:
                 .values(question_id=question_id)
             )
         else:
-            conn.execute(daily_questions.insert().values(day=day, question_id=question_id))
+            conn.execute(
+                daily_questions.insert().values(day=day, question_id=question_id)
+            )

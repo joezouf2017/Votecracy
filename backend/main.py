@@ -2,11 +2,10 @@ import logging
 import os
 import random
 
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-
 import content
 from daily import router as daily_router
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from models import QuestionSummary, RevealData, VoteRequest
 
 log = logging.getLogger(__name__)

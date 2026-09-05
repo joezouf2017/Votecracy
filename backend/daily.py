@@ -21,16 +21,15 @@ Degradation policy when Redis is unavailable:
 """
 
 import logging
-from datetime import date, datetime, time, timedelta, timezone
-
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from sqlalchemy.exc import SQLAlchemyError
+from datetime import UTC, date, datetime, time, timedelta
 
 import cache
 import content
 import db
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from identity import get_voter_id
 from models import DailyQuestion, DailyResults, VoteRequest
+from sqlalchemy.exc import SQLAlchemyError
 
 log = logging.getLogger(__name__)
 
@@ -40,7 +39,7 @@ router = APIRouter(prefix="/api/daily", tags=["daily"])
 def now() -> datetime:
     """The clock, in one place. Every time-dependent branch reads it, so tests
     can move time instead of waiting for it."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def today() -> date:
@@ -61,7 +60,9 @@ def question_for_day(day: date) -> dict:
     except SQLAlchemyError:
         # Serving yesterday's rotation beats serving a 500. The admin override
         # is a nice-to-have; having a question at all is not.
-        log.warning("daily_questions lookup failed, falling back to rotation", exc_info=True)
+        log.warning(
+            "daily_questions lookup failed, falling back to rotation", exc_info=True
+        )
 
     question = content.get_question(question_id) if question_id else None
     if question is None:
@@ -72,7 +73,7 @@ def question_for_day(day: date) -> dict:
 
 def tally_available_at(day: date) -> datetime:
     """Midnight UTC at the end of `day` — when the community count unlocks."""
-    return datetime.combine(day + timedelta(days=1), time.min, tzinfo=timezone.utc)
+    return datetime.combine(day + timedelta(days=1), time.min, tzinfo=UTC)
 
 
 def tally_is_unlocked(day: date, at: datetime) -> bool:
@@ -107,7 +108,9 @@ def voter_choice(question_id: str, voter_id: str) -> str | None:
         if cached is not None:
             return cached
     except cache.CacheUnavailable:
-        log.warning("redis unavailable, reading voter choice from postgres", exc_info=True)
+        log.warning(
+            "redis unavailable, reading voter choice from postgres", exc_info=True
+        )
 
     try:
         return db.get_voter_choice(question_id, voter_id)
@@ -134,7 +137,9 @@ def community_tally(question_id: str) -> dict[str, int] | None:
     try:
         tally = db.tally(question_id)
     except SQLAlchemyError:
-        log.warning("postgres unavailable, serving tally from the redis cache", exc_info=True)
+        log.warning(
+            "postgres unavailable, serving tally from the redis cache", exc_info=True
+        )
         try:
             return cache.get_tally(question_id)
         except cache.CacheUnavailable:
@@ -168,7 +173,7 @@ def persist_vote(question_id: str, voter_id: str, choice: str) -> None:
             )
     except SQLAlchemyError:
         log.error(
-            "durable write failed for voter %s on %s; the vote is counted in redis only",
+            "durable write failed for voter %s on %s; vote counted in redis only",
             voter_id,
             question_id,
             exc_info=True,
@@ -222,7 +227,7 @@ def vote_daily(
 
     try:
         count = cache.cast_vote(question["id"], voter_id, body.choice)
-    except cache.CacheUnavailable:
+    except cache.CacheUnavailable as unavailable:
         # Fail closed. Without the atomic dedupe+tally gate there's no way to
         # accept a vote and still guarantee it's counted exactly once, and an
         # exact count is the one thing this whole design exists to protect.
@@ -232,7 +237,7 @@ def vote_daily(
             status_code=503,
             detail="Voting is temporarily unavailable. Please try again in a moment.",
             headers={"Retry-After": "5"},
-        )
+        ) from unavailable
 
     if count == cache.DUPLICATE_VOTE:
         raise HTTPException(

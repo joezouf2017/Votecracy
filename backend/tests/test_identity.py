@@ -11,7 +11,6 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-
 from identity import ANON_PREFIX, COOKIE_NAME
 from main import app
 
