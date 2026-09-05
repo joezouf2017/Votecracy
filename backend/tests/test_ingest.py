@@ -133,3 +133,69 @@ def test_an_unknown_role_is_refused_before_anything_is_written():
             passage=ingest.Passage(0, 5, "hello"),
             role="spoiler",
         )
+
+
+# --- boundary-aware chunking --------------------------------------------------
+#
+# `size` is a ceiling, not a width. Cutting at exactly `size` split 51% of the
+# real chunks part-way through a word at both ends.
+
+
+def test_a_chunk_never_starts_or_ends_inside_a_word():
+    """The property, stated directly: no cut may fall between two letters."""
+    text = (
+        "The committee bill provides hospital insurance for the aged. " * 60
+    ).strip()
+    for _, start, end in ingest.chunk(text, size=200, overlap=40):
+        assert not (start > 0 and text[start - 1].isalpha() and text[start].isalpha())
+        assert not (end < len(text) and text[end - 1].isalpha() and text[end].isalpha())
+
+
+def test_a_paragraph_break_is_preferred_over_a_sentence_end():
+    """Best-first: a paragraph boundary keeps a whole argument together where a
+    sentence boundary would cut through the middle of one."""
+    text = "a" * 120 + ". " + "b" * 30 + "\n\n" + "c" * 200
+    first_end = next(ingest.chunk(text, size=200, overlap=20))[2]
+    assert text[:first_end].endswith("\n\n")
+
+
+def test_size_is_a_ceiling_never_exceeded():
+    text = "word " * 500
+    assert all(e - s <= 300 for _, s, e in ingest.chunk(text, size=300, overlap=50))
+
+
+def test_chunks_still_tile_the_whole_text():
+    """Snapping must not drop characters between chunks."""
+    text = "The bill provides hospital insurance. " * 40
+    pieces = list(ingest.chunk(text, size=250, overlap=50))
+    assert pieces[0][1] == 0
+    assert pieces[-1][2] == len(text)
+    for (_, _, end), (_, nxt, _) in zip(pieces, pieces[1:], strict=False):
+        assert nxt < end, "the next chunk must start inside the previous one"
+
+
+def test_text_with_no_boundary_at_all_still_advances():
+    """A run of letters with nowhere to break must hard-cut rather than loop."""
+    pieces = list(ingest.chunk("x" * 2000, size=500, overlap=100))
+    assert len(pieces) > 1
+    assert pieces[-1][2] == 2000
+
+
+def test_no_chunk_edge_falls_inside_a_word_in_the_source():
+    """The property at the scope that matters.
+
+    Chunks are cut from passages and passages from the source, so a chunk can
+    sit on clean boundaries *within its passage* while the passage itself
+    opened mid-word. Measuring inside the passage said 0% while 63% of edges
+    against the source were still bad. This measures against the source."""
+    source = (
+        "The committee bill provides hospital insurance for the aged. " * 80
+    ).strip()
+    for passage in ingest.extract_passages(source, ["hospital"], radius=300):
+        for _, start, end in ingest.chunk(passage.text, size=200, overlap=40):
+            for cut in (passage.start + start, passage.start + end):
+                assert not (
+                    0 < cut < len(source)
+                    and source[cut - 1].isalpha()
+                    and source[cut].isalpha()
+                ), f"cut at {cut}: {source[cut - 20 : cut + 20]!r}"
