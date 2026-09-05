@@ -10,12 +10,64 @@ is ever allowed to take before a player has voted.
 """
 
 import json
+from datetime import date
 from pathlib import Path
 
 _DATA_PATH = Path(__file__).parent / "data" / "questions.json"
 
+# What kind of decision the question is about. `select_sources` routes on this:
+# Voteview covers congressional_passage and nothing else (it is a congressional
+# dataset, so a constitutional ratification isn't in it at all), Hansard covers
+# parliamentary_division, and an agency_rule lives in the agency's own record.
+VOTE_TYPES = frozenset(
+    {
+        "congressional_passage",
+        "constitutional_ratification",
+        "parliamentary_division",
+        "agency_rule",
+    }
+)
+
+# The only keys a player may see before voting. A whitelist, not a blacklist:
+# the previous version stripped `reveal` and passed everything else through,
+# which fails open the moment a field is added — as the three pipeline fields
+# below just demonstrated. Rule #1 is enforced structurally everywhere else in
+# this codebase; a list of things to remember to hide is the weaker kind.
+_PUBLIC_FIELDS = frozenset({"id", "category", "era", "prompt", "options"})
+
+
+def _validate(q: dict) -> None:
+    """Reject a malformed question at import time.
+
+    This module reads the file on import, so a bad entry takes the process
+    down at startup rather than surfacing halfway through a retrieval run.
+    `decision_date` in particular is a safety boundary — the pre-vote index is
+    everything published before it — so a missing or unparseable one must not
+    be something the pipeline can discover later.
+    """
+    qid = q.get("id", "<no id>")
+    for field in ("jurisdiction", "vote_type", "decision_date"):
+        if not q.get(field):
+            raise ValueError(f"question {qid!r} is missing {field!r}")
+    if q["vote_type"] not in VOTE_TYPES:
+        raise ValueError(
+            f"question {qid!r} has unknown vote_type {q['vote_type']!r}; "
+            f"expected one of {sorted(VOTE_TYPES)}"
+        )
+    try:
+        date.fromisoformat(q["decision_date"])
+    except ValueError as exc:
+        raise ValueError(
+            f"question {qid!r} has an unparseable decision_date "
+            f"{q['decision_date']!r}: {exc}"
+        ) from exc
+
+
 with open(_DATA_PATH, encoding="utf-8") as f:
     _questions: list[dict] = json.load(f)
+
+for _q in _questions:
+    _validate(_q)
 
 _by_id: dict[str, dict] = {q["id"]: q for q in _questions}
 
@@ -36,6 +88,25 @@ def rotation() -> list[str]:
     return _rotation
 
 
+def decision_date(question_id: str) -> date | None:
+    """The boundary the retrieval scope is cut on.
+
+    Pre-vote material is everything published strictly before this date; the
+    outcome is everything from it onwards. See "Retrieval scope" in CLAUDE.md
+    for why the rule is a date rather than a source type, and
+    docs/content-audit.md for where each of these dates came from.
+    """
+    q = _by_id.get(question_id)
+    return date.fromisoformat(q["decision_date"]) if q else None
+
+
 def public_view(q: dict) -> dict:
-    """Strip the reveal field so it's never sent before a vote."""
-    return {k: v for k, v in q.items() if k != "reveal"}
+    """The only shape a question may take before its player has voted.
+
+    Drops the reveal *and* the pipeline metadata — `decision_date`,
+    `vote_type` and `jurisdiction` describe how content is built, and have no
+    business in front of a player. The API is already narrowed by the
+    `QuestionSummary` response model, but the Phase 3 chatbot won't go through
+    that; it will go through here.
+    """
+    return {k: v for k, v in q.items() if k in _PUBLIC_FIELDS}

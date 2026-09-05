@@ -3,6 +3,9 @@
     "id": "us-medicare-1965",
     "category": "medical",
     "era": "historical",
+    "jurisdiction": "US",
+    "vote_type": "congressional_passage",
+    "decision_date": "1965-04-08",
     "prompt": "It's 1965. Congress is debating Medicare — federal health insurance for Americans over 65. Opponents warn it's socialism; supporters say millions of seniors can't afford care. Do you vote for it?",
     "options": ["Support", "Oppose"],
     "reveal": {
@@ -15,6 +18,9 @@
     "id": "us-prohibition-1919",
     "category": "society",
     "era": "historical",
+    "jurisdiction": "US",
+    "vote_type": "constitutional_ratification",
+    "decision_date": "1919-01-16",
     "prompt": "It's 1919. Prohibition advocates say alcohol is destroying families and fueling crime. The 18th Amendment would ban alcohol nationwide. Do you support ratification?",
     "options": ["Support", "Oppose"],
     "reveal": {
@@ -27,6 +33,9 @@
     "id": "us-interstate-highway-1956",
     "category": "economy",
     "era": "historical",
+    "jurisdiction": "US",
+    "vote_type": "congressional_passage",
+    "decision_date": "1956-04-27",
     "prompt": "It's 1956. President Eisenhower proposes a $25 billion federal highway system — the largest public works project in US history. Critics say it's too expensive and a federal overreach. Do you support the Federal Aid Highway Act?",
     "options": ["Support", "Oppose"],
     "reveal": {
@@ -39,6 +48,9 @@
     "id": "us-clean-air-act-1970",
     "category": "society",
     "era": "historical",
+    "jurisdiction": "US",
+    "vote_type": "congressional_passage",
+    "decision_date": "1970-06-10",
     "prompt": "It's 1970. American cities choke with smog; the Cuyahoga River caught fire the year before. The Clean Air Act would give the federal government power to set emission limits on cars and factories. Industry groups warn it will destroy jobs. Do you support it?",
     "options": ["Support", "Oppose"],
     "reveal": {
@@ -51,6 +63,9 @@
     "id": "us-net-neutrality-2015",
     "category": "technology",
     "era": "recent",
+    "jurisdiction": "US",
+    "vote_type": "agency_rule",
+    "decision_date": "2015-02-26",
     "prompt": "It's 2015. The FCC is debating Net Neutrality — rules preventing internet providers from slowing specific websites or charging extra for 'fast lanes.' Telecom companies say it will kill investment; advocates say it protects a free internet. Do you support it?",
     "options": ["Support", "Oppose"],
     "reveal": {
@@ -63,6 +78,9 @@
     "id": "us-affordable-care-act-2010",
     "category": "medical",
     "era": "recent",
+    "jurisdiction": "US",
+    "vote_type": "congressional_passage",
+    "decision_date": "2010-03-21",
     "prompt": "It's 2010. The Affordable Care Act would expand Medicaid, require insurers to cover pre-existing conditions, and mandate most Americans buy health insurance. Supporters say 30 million uninsured will gain coverage; opponents call it unconstitutional government overreach. Do you support it?",
     "options": ["Support", "Oppose"],
     "reveal": {
@@ -75,6 +93,9 @@
     "id": "us-income-tax-1913",
     "category": "economy",
     "era": "historical",
+    "jurisdiction": "US",
+    "vote_type": "constitutional_ratification",
+    "decision_date": "1913-02-03",
     "prompt": "It's 1913. Congress is debating the 16th Amendment, which would allow a permanent federal income tax. The initial rate would be just 1% on income above $3,000 (about $90,000 today). Opponents warn rates will inevitably rise. Do you support ratification?",
     "options": ["Support", "Oppose"],
     "reveal": {
@@ -87,6 +108,9 @@
     "id": "uk-national-health-service-1946",
     "category": "medical",
     "era": "historical",
+    "jurisdiction": "UK",
+    "vote_type": "parliamentary_division",
+    "decision_date": "1946-05-02",
     "prompt": "It's 1946 in postwar Britain. The Labour government proposes the National Health Service — free healthcare for every citizen, funded by taxes. Doctors warn it will destroy medicine. Supporters say no one should die for lack of money. Do you vote for it?",
     "options": ["Support", "Oppose"],
     "reveal": {

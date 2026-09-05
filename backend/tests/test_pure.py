@@ -2,13 +2,20 @@
 
 Everything else in this suite goes through the ASGI stack, which is the right
 shape for the bugs this system actually has (races, cache/store divergence).
-It's the wrong shape for these four, which are pure functions whose failure
-modes are entirely local — and two of them had no direct coverage at all.
+It's the wrong shape for the functions here, which are pure and whose failure
+modes are entirely local.
+
+Some of these are dataset assertions rather than code ones — that every
+question carries a `decision_date` in the year its prompt claims, for instance.
+They live here because the thing they protect (the pre-vote retrieval boundary)
+is a property of the content, and there is no request to route through to check
+it.
 
 The one impurity left: importing `content` reads questions.json once at import
 time. Not worth restructuring the module to avoid, but worth naming.
 """
 
+import re
 from datetime import date, datetime, timezone
 from uuid import uuid4
 
@@ -77,6 +84,9 @@ SAMPLE = {
     "era": "historical",
     "prompt": "Do you vote for it?",
     "options": ["Support", "Oppose"],
+    "jurisdiction": "US",
+    "vote_type": "congressional_passage",
+    "decision_date": "1965-04-08",
     "reveal": {"actual_vote": "Passed", "outcome": "...", "source": "..."},
 }
 
@@ -85,8 +95,29 @@ def test_public_view_strips_the_reveal():
     assert "reveal" not in content.public_view(SAMPLE)
 
 
-def test_public_view_keeps_everything_else():
-    assert content.public_view(SAMPLE) == {k: v for k, v in SAMPLE.items() if k != "reveal"}
+def test_public_view_returns_exactly_the_player_facing_fields():
+    assert content.public_view(SAMPLE) == {
+        "id": "q1",
+        "category": "medical",
+        "era": "historical",
+        "prompt": "Do you vote for it?",
+        "options": ["Support", "Oppose"],
+    }
+
+
+@pytest.mark.parametrize("field", ["jurisdiction", "vote_type", "decision_date"])
+def test_public_view_strips_pipeline_metadata(field):
+    """These describe how content is built, not what a player is playing."""
+    assert field not in content.public_view(SAMPLE)
+
+
+def test_public_view_drops_fields_it_has_never_heard_of():
+    """The point of the whitelist. A blacklist passes every test above and
+    still leaks the next field someone adds — which is exactly what happened
+    when jurisdiction/vote_type/decision_date arrived."""
+    assert content.public_view({**SAMPLE, "internal_scratch": "leak me"}) == content.public_view(
+        SAMPLE
+    )
 
 
 def test_public_view_does_not_mutate_its_input():
@@ -102,6 +133,68 @@ def test_public_view_does_not_mutate_its_input():
 def test_public_view_is_idempotent():
     once = content.public_view(SAMPLE)
     assert content.public_view(once) == once
+
+
+# --- the questions' pipeline metadata -----------------------------------------
+#
+# Dataset assertions, not code ones: a failure here means questions.json is
+# wrong, and `content._validate` would already have refused to import.
+# `decision_date` is the pre-vote retrieval boundary, so "it parses" and "it is
+# in the year the prompt puts the player in" are safety properties, not tidiness.
+
+
+@pytest.mark.parametrize("q", content.all_questions(), ids=lambda q: q["id"])
+def test_every_question_carries_a_usable_decision_date(q):
+    assert content.decision_date(q["id"]) == date.fromisoformat(q["decision_date"])
+
+
+@pytest.mark.parametrize("q", content.all_questions(), ids=lambda q: q["id"])
+def test_every_question_has_a_routable_vote_type(q):
+    """`select_sources` routes on this and is required to raise rather than
+    fall back to a default, so an unrecognised value is a hard failure later."""
+    assert q["vote_type"] in content.VOTE_TYPES
+    assert q["jurisdiction"]
+
+
+@pytest.mark.parametrize("q", content.all_questions(), ids=lambda q: q["id"])
+def test_decision_date_falls_in_the_year_the_prompt_claims(q):
+    """The prompt opens with "It's <year>". If the boundary sits before that
+    year, everything the scene refers to is already outcome material and the
+    pre-vote corpus comes out empty; if it sits after, the player is being
+    asked about something already decided. Both are content bugs that no
+    amount of retrieval code can fix."""
+    prompt_year = int(re.search(r"It's (\d{4})", q["prompt"]).group(1))
+    assert content.decision_date(q["id"]).year == prompt_year
+
+
+def test_decision_date_is_none_for_an_unknown_question():
+    assert content.decision_date("does-not-exist") is None
+
+
+@pytest.mark.parametrize(
+    "broken",
+    [
+        {},  # no metadata at all
+        {"jurisdiction": "US", "vote_type": "congressional_passage"},  # no date
+        {"jurisdiction": "US", "decision_date": "1965-04-08"},  # no vote_type
+        {"vote_type": "congressional_passage", "decision_date": "1965-04-08"},
+        {**{"jurisdiction": "US", "decision_date": "1965-04-08"}, "vote_type": "referendum"},
+        {**{"jurisdiction": "US", "vote_type": "agency_rule"}, "decision_date": "1965"},
+        {**{"jurisdiction": "US", "vote_type": "agency_rule"}, "decision_date": "not a date"},
+        {**{"jurisdiction": "US", "vote_type": "agency_rule"}, "decision_date": "1965-13-40"},
+        {**{"jurisdiction": "", "vote_type": "agency_rule"}, "decision_date": "1965-04-08"},
+    ],
+)
+def test_validate_rejects_unusable_pipeline_metadata(broken):
+    """Runs on import, so this is what stops the process rather than letting a
+    question with no retrieval boundary reach the pipeline."""
+    with pytest.raises(ValueError):
+        content._validate({"id": "q1", **broken})
+
+
+def test_validate_accepts_what_the_dataset_actually_contains():
+    for q in content.all_questions():
+        content._validate(q)
 
 
 # --- content.rotation ---------------------------------------------------------
