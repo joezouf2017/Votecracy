@@ -9,13 +9,24 @@ services:
       # Comma-separated. Change this if the frontend moves off Vite's port.
       - CORS_ORIGINS=http://localhost:5173
     depends_on:
-      - postgres
-      - redis
+      # `depends_on` alone waits for the container to start, not for the
+      # service to accept connections. The container runs `alembic upgrade
+      # head` before uvicorn, so an unready Postgres kills it outright — a
+      # cold `docker compose up` on a clean machine fails without this.
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - ./backend:/app
 
   postgres:
     image: postgres:16-alpine
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U votecracy -d votecracy"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
     environment:
       - POSTGRES_USER=votecracy
       - POSTGRES_PASSWORD=votecracy
@@ -33,6 +44,11 @@ services:
     # loss at roughly a second of votes. The named volume matters as much as
     # the flag: without it the append log dies with the container.
     command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
     ports:
       - "6379:6379"
     volumes:

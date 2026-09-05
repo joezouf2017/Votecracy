@@ -1,0 +1,8 @@
+# Build-context hygiene. Without this, COPY . . pulls test caches into the
+# image and — worse — their contents change on every local test run, which
+# busts the Docker layer cache and rebuilds the image for no reason.
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
