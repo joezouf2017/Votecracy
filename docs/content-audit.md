@@ -97,17 +97,63 @@ passed H.R. 17255 on 1970-06-10 by a recorded vote of **375–1**. The reveal's
 larger claim ("one of the most bipartisan bills ever") survives — 375–1 makes
 it better, not worse — but the mechanism is misstated.
 
-## What this implies for step 3
+## Source coverage, as measured in Step 3
 
-`select_sources` routes on `vote_type`, and two of the four values have no
-source wired up yet:
+Generated from `sources.select_sources`, not written by hand — this is what the
+routing table does today, not what it was meant to do.
 
-- `constitutional_ratification` — Voteview is a congressional dataset and does
-  not cover state ratification at all. Two of the eight questions need
-  something else entirely.
-- `parliamentary_division` — Hansard, for the one UK question.
+| Question | `framing` | `vote_record` | `outcome` |
+|---|---|---|---|
+| `us-medicare-1965` | `govinfo:crecb`, `govinfo:statute`, `loc:chronicling-america` | `voteview`, `govinfo:crecb` | `govinfo:crecb`, `govinfo:crec` |
+| `us-prohibition-1919` | `govinfo:crecb`, `govinfo:statute`, `loc:chronicling-america` | **raises** | `govinfo:crecb`, `govinfo:crec`, `loc:chronicling-america` |
+| `us-interstate-highway-1956` | `govinfo:crecb`, `govinfo:statute`, `loc:chronicling-america` | `voteview`, `govinfo:crecb` | `govinfo:crecb`, `govinfo:crec`, `loc:chronicling-america` |
+| `us-clean-air-act-1970` | `govinfo:crecb`, `govinfo:statute`, `loc:chronicling-america` | `voteview`, `govinfo:crecb` | `govinfo:crecb`, `govinfo:crec` |
+| `us-net-neutrality-2015` | **raises** | **raises** | **raises** |
+| `us-affordable-care-act-2010` | `govinfo:crecb`, `govinfo:crec`, `govinfo:statute` | `voteview`, `govinfo:crecb`, `govinfo:crec` | `govinfo:crecb`, `govinfo:crec` |
+| `us-income-tax-1913` | `govinfo:crecb`, `govinfo:statute`, `loc:chronicling-america` | **raises** | `govinfo:crecb`, `govinfo:crec`, `loc:chronicling-america` |
+| `uk-national-health-service-1946` | **raises** | **raises** | **raises** |
 
-CLAUDE.md requires `select_sources` to raise rather than fall back to a default
-when nothing matches. With the whitelist as it stands today, three of eight
-questions would raise. That's the correct behaviour and the reason to write it
-that way: a silent default would have made this gap invisible.
+Eight of the twenty-four cells raise. That is Step 3's designed output, not a
+defect list to burn down before moving on:
+
+- **`us-net-neutrality-2015`** raises for everything. It is an `agency_rule`
+  and there is no FCC source in the whitelist; the one source not restricted
+  by `vote_type` (Chronicling America) stops 52 years before the decision.
+- **`uk-national-health-service-1946`** raises for everything. Every source in
+  the whitelist is US-only, and Hansard isn't wired up.
+- **`us-prohibition-1919`** and **`us-income-tax-1913`** raise for
+  `vote_record` alone. Framing and outcome are fine; what's missing is the
+  *deciding* vote, because both reveals cite state ratification and every
+  congressional source — Voteview and the Congressional Record alike — covers
+  only what Congress did. Spike finding 3, now measured.
+
+CLAUDE.md had this as two `vote_type` values affecting three questions. It is
+three values affecting four: `agency_rule` has no source either, and had been
+overlooked.
+
+Two things the matrix makes visible that weren't obvious in advance:
+
+- **Chronicling America still serves the Clean Air Act's framing.** Its
+  coverage ends in 1963 and the decision is in 1970, but the ten-year lookback
+  opens the window in 1960, so 1960–63 is a genuine overlap. Queries are
+  clamped to it rather than asking for years the source cannot hold.
+- **`outcome` does not raise for most questions**, because the Congressional
+  Record keeps running after a decision. That material records what was *said*
+  about effects rather than evidence of them, so anything numeric drawn from
+  it must be attributed to a speaker. Statistical outcome sources — FRED,
+  PubMed — are still absent, so outcome coverage is thin in quality even
+  where it is non-empty.
+
+## What the remaining gaps need
+
+- `constitutional_ratification` needs a source for **state** ratification
+  votes. No congressional dataset has them at any date.
+- `parliamentary_division` needs **Hansard**, which would also be the first
+  non-US source and so the first test of the `jurisdictions` field.
+- `agency_rule` needs the **FCC's own record** (the 2015 order is FCC 15-24 in
+  GN Docket No. 14-28).
+
+`select_sources` raising rather than defaulting is what makes these three
+countable. A silent fallback would have produced a plausible answer for every
+question and left the gaps invisible until a reveal turned out to cite
+nothing.
