@@ -21,11 +21,9 @@ from uuid import uuid4
 
 import pytest
 
-import content
-import daily
-import identity
-import settings
-from identity import ANON_PREFIX
+from game import daily, identity
+from game.identity import ANON_PREFIX
+from shared import content, settings
 
 # --- daily.tally_available_at / tally_is_unlocked -----------------------------
 #

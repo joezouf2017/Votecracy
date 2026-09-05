@@ -6,10 +6,8 @@ from uuid import uuid4
 
 import pytest
 
-import cache
-import content
-import daily
-import db
+from game import cache, daily
+from shared import content, db
 
 # --- rule #1: nothing reveals before the vote ---------------------------------
 

@@ -23,7 +23,7 @@ prompt cannot.
 
 import re
 
-from grounding import numbers_in
+from pipeline.grounding import numbers_in
 
 # Four or more letters: shorter tokens are almost all function words, and they
 # generate noise without ever being the thing that gives an outcome away.

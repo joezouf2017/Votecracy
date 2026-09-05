@@ -27,7 +27,7 @@ import re
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 
-import db
+from shared import db
 
 log = logging.getLogger(__name__)
 

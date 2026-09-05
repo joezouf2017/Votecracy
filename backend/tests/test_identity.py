@@ -12,8 +12,8 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-from identity import ANON_PREFIX, COOKIE_NAME
-from main import app
+from game.identity import ANON_PREFIX, COOKIE_NAME
+from game.main import app
 
 VOTER_ID = re.compile(r"\Aanon:[0-9a-f]{32}\Z")
 

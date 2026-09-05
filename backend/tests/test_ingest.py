@@ -7,7 +7,7 @@ suite uses, via the autouse fixtures in conftest.
 
 import pytest
 
-import ingest
+from pipeline import ingest
 
 # --- normalise ----------------------------------------------------------------
 #

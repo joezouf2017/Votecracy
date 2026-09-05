@@ -19,10 +19,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
 
-import cache
-import daily
-import db
-from main import app
+from game import cache, daily
+from game.main import app
+from shared import db
 
 
 @pytest.fixture(autouse=True)

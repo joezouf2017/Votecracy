@@ -8,8 +8,8 @@ DATABASE_URL needs. One decision about how to connect, not two that can drift.
 
 from logging.config import fileConfig
 
-import db
 from alembic import context
+from shared import db
 
 config = context.config
 

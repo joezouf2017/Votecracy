@@ -4,11 +4,11 @@ import random
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-import content
-from daily import router as daily_router
-from logging_config import configure_logging
-from models import QuestionSummary, RevealData, VoteRequest
-from settings import get_settings
+from game.daily import router as daily_router
+from game.models import QuestionSummary, RevealData, VoteRequest
+from shared import content
+from shared.logging_config import configure_logging
+from shared.settings import get_settings
 
 # Before anything else logs. uvicorn leaves the root logger unconfigured, so
 # without this the application's records reach stderr through

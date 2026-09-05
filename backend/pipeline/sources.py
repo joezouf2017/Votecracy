@@ -14,8 +14,7 @@ steps later when a reveal turns out to cite nothing.
 from dataclasses import dataclass
 from datetime import date, timedelta
 
-import content
-import db
+from shared import content, db
 
 # How far back a question's framing material may reach. A judgement call, not
 # a fact: long enough to catch the run-up to a decision — Medicare was argued

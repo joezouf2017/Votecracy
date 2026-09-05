@@ -31,7 +31,7 @@ import time
 import urllib.error
 import urllib.request
 
-from settings import get_settings
+from shared.settings import get_settings
 
 log = logging.getLogger(__name__)
 

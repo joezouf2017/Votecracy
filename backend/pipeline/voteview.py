@@ -29,7 +29,7 @@ from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path
 
-import sources
+from pipeline import sources
 
 log = logging.getLogger(__name__)
 

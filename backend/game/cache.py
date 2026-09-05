@@ -16,7 +16,7 @@ from functools import lru_cache
 
 import redis
 
-from settings import get_settings
+from shared.settings import get_settings
 
 # KEYS[1] = voted:{question_id}:{voter_id}   ARGV[1] = choice
 # KEYS[2] = tally:{question_id}              ARGV[2] = ttl seconds for the marker

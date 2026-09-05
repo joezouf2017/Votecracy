@@ -14,9 +14,8 @@ from datetime import date
 
 import pytest
 
-import content
-import db
-import sources
+from pipeline import sources
+from shared import content, db
 
 # Every question x need cell. A tuple of source keys, or RAISE.
 #

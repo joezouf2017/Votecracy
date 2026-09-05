@@ -23,7 +23,7 @@ consuming it would be guessing.
 import logging
 from logging.config import dictConfig
 
-from settings import get_settings
+from shared.settings import get_settings
 
 _FORMAT = "%(asctime)s %(levelname)-8s %(name)s: %(message)s"
 

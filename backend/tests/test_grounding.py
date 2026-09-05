@@ -8,7 +8,13 @@ a claim is grounded, it has stopped being a check.
 
 import pytest
 
-from grounding import MAX_SPAN_CHARS, Claim, numbers_in, unsupported_numbers, verify
+from pipeline.grounding import (
+    MAX_SPAN_CHARS,
+    Claim,
+    numbers_in,
+    unsupported_numbers,
+    verify,
+)
 
 # A real sentence from the 1965 Congressional Record volume, lightly trimmed.
 DOC = (

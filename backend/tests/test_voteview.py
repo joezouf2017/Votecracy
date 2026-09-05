@@ -10,7 +10,7 @@ from datetime import date
 
 import pytest
 
-import voteview
+from pipeline import voteview
 
 
 def row(**kw):

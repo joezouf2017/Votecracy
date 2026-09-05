@@ -2,7 +2,7 @@
 that the argument for it actually held.
 """
 
-from spoilers import forbidden, leaks
+from pipeline.spoilers import forbidden, leaks
 
 REVEAL = (
     "Passed 307-116 in the House. "

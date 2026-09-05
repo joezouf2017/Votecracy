@@ -40,7 +40,7 @@ from sqlalchemy import (
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.types import TypeDecorator
 
-from settings import get_settings
+from shared.settings import get_settings
 
 metadata = MetaData()
 

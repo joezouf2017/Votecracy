@@ -12,8 +12,7 @@ exact count that every other test in this suite is protecting.
 
 import logging
 
-import cache
-import daily
+from game import cache, daily
 
 
 def test_vote_is_refused_with_503_when_redis_is_down(client, kill_redis):
