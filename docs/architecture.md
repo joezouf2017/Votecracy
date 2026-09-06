@@ -291,6 +291,27 @@ enough to be evidence rather than a haystack, and actually contains the value �
 citation vouches for. **No model is involved**, deliberately — using an LLM to
 decide whether an LLM hallucinated reintroduces exactly what the rule prevents.
 
+**The model never produces the span.** It is asked for a verbatim quote; code
+locates that quote in the chunk it was given and derives `(document_id,
+char_span)` from the match. Asking a model for character offsets produces
+numbers that are confidently wrong, because counting characters is not
+something it can do — and a wrong offset that lands inside the document passes
+every structural check `verify` makes.
+
+Deriving them instead buys three things at once. The offsets are correct by
+construction. A quote that cannot be found is itself a detection — the model
+paraphrased where it claimed to quote, which is the first move of a
+fabrication. And `MAX_SPAN_CHARS` then applies to the quote rather than to the
+chunk, which resolves an otherwise real conflict: a chunk is 1000 characters
+and the limit is 600, so **a whole chunk is never a citable span** (192 of the
+Medicare slice's 218). Both numbers are right — a retrieval unit and a piece of
+evidence are different things — and the missing piece was only ever that the
+prompt has to ask for a span *within* what it was handed.
+
+`grounding.verify` needs no change for this; it already takes the span as given.
+What it constrains is the generator's output contract, which is why it is
+settled here rather than discovered in Step 7.
+
 **A judge, for neutrality only.** The one check with no deterministic ground
 truth, and it must be a different model family from the generator: a
 same-family judge shares the generator's blind spots.
