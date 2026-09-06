@@ -5,8 +5,9 @@
 
 Prices from [ai.google.dev/gemini-api/docs/pricing](https://ai.google.dev/gemini-api/docs/pricing),
 checked 2026-09-05. Corpus sizes measured from the Medicare slice in the local
-database. Everything offline uses the Batch API, which is half price and covers
-the entire pipeline and the entire eval run.
+database. Generation and the eval runs use the Batch API at half price;
+embeddings deliberately do not, for a reason that is not about money — see
+"Batch and sync are not interchangeable" below.
 
 ## Measured, per question
 
@@ -25,16 +26,21 @@ nothing post-vote has been fetched yet, so the model assumes it adds half again
 
 | questions | embed | generate | judge | **total** | tokens |
 |---|---|---|---|---|---|
-| 8 | $0.04 | $0.07 | $0.00 | **$0.12** | 0.6M embed, 0.4M in, 0.04M out |
-| 100 | $0.52 | $0.90 | $0.05 | **$1.46** | 6.9M embed, 4.7M in, 0.48M out |
-| 500 | $2.58 | $4.50 | $0.24 | **$7.32** | 34.5M embed, 23.5M in, 2.4M out |
+| 8 | $0.08 | $0.07 | $0.00 | **$0.16** | 0.6M embed, 0.4M in, 0.04M out |
+| 100 | $1.03 | $0.90 | $0.05 | **$1.98** | 6.9M embed, 4.7M in, 0.48M out |
+| 500 | $5.17 | $4.50 | $0.24 | **$9.91** | 34.5M embed, 23.5M in, 2.4M out |
 
-Flash-Lite 3.1 on the Batch API. On full Flash 3.7 the 500-question build is
-$15.90 — the model choice moves the one-off bill by $8, which is not a
+Flash-Lite 3.1, generation on the Batch API and embeddings at full price (see
+below for why). On full Flash 3.7 the 500-question build is
+$18.48 — the model choice moves the one-off bill by $8, which is not a
 decision worth agonising over.
 
-Generation dominates embedding despite embedding processing 34.5M tokens
-against generation's 23.5M, because output tokens cost 6x input.
+Embedding and generation come out close — $5.17 against $4.50 — and the two
+reasons pull against each other. Embedding processes more tokens (34.5M against
+23.5M) but has no output side, and output costs 6x input. Generation then gets
+the batch discount and embedding does not, which is what closes the gap.
+
+Neither is worth optimising. The entire one-off build is under ten dollars.
 
 ## The acceptance gate — recurring
 
@@ -79,7 +85,7 @@ follow-ups — pays for itself faster than anything in the pipeline.
 The free tier's binding limit is **20 requests per day** — a limit on *requests*,
 not on spend. One smoke subset of the eval exceeds it, so the acceptance gate
 cannot run at all. Removing that cap costs, at the project's real scale,
-**$2.39/month for a weekly full eval and a one-off $7.32 to build 500
+**$2.39/month for a weekly full eval and a one-off $9.91 to build 500
 questions.**
 
 Cutting the eval plan to fit the free tier would trade the phase's only
@@ -109,6 +115,24 @@ this document holds either way:
 chatbot's latency, move that one path direct — it is the only latency-sensitive
 caller, and the only reason left to split.
 
+### Batch and sync are not interchangeable, and the difference is not the price
+
+Two of the features above are **dropped on the Batch API**: `input_type` and
+`provider` preferences. Neither failure is loud. That splits the work in three:
+
+| | batch? | why |
+|---|---|---|
+| Embeddings | **no** | Batch drops `input_type`, so documents lose the RETRIEVAL_DOCUMENT instruction. It does not error — it ranks worse. Costs $2.60 more at 500 questions |
+| Generation, judge, eval runs | **yes** | `input_type` is meaningless for chat, and the content is public-domain records and our own attack strings, so losing `provider` routing carries nothing |
+| Live chatbot | **n/a** | Synchronous by definition, and the one path carrying real user input — which is exactly where `provider` privacy routing must be on |
+
+The batch docs also say embeddings are "rolling out on providers that support
+them", so coverage is per-provider and undocumented. Moot here, since
+embeddings do not go through batch anyway.
+
+**Avoid `:free` embedding models entirely.** Their model cards state outright
+that submitted requests and embeddings may be retained for training.
+
 > Two earlier drafts of this section claimed OpenRouter had no Batch API and no
 > `dimensions` parameter. Both were wrong, and wrong the same way: read from the
 > FAQ and the docs overview, where the absence of a mention was treated as the
@@ -120,8 +144,8 @@ caller, and the only reason left to split.
 ### Do not switch embedding models to save money
 
 The catalogue has models at $0.004–$0.01/M against gemini-embedding-001's
-$0.15, which would take the 500-question embedding line from $2.58 to about
-$0.35. Embedding is 35% of a one-off build that costs less than a sandwich and
+$0.15, which would take the 500-question embedding line from $5.17 to about
+$0.70. Embedding is half of a one-off build that costs less than a sandwich and
 generation dominates it anyway, so the saving is not the point. What matters is
 what a switch actually costs, and that is two separate things which are easy to
 conflate:

@@ -62,8 +62,14 @@ def cost(model, tokens_in, tokens_out, batch=True):
 
 
 def build(n_questions, model="flash-lite-3.1"):
-    """One-off: everything it takes to turn N decisions into playable questions."""
-    embed = cost("embedding-001", n_questions * CORPUS_TOKENS, 0)
+    """One-off: everything it takes to turn N decisions into playable questions.
+
+    Embedding is deliberately NOT batched. OpenRouter's Batch API drops
+    `input_type`, which is the RETRIEVAL_DOCUMENT / RETRIEVAL_QUERY asymmetry
+    `embedding.py` relies on — losing it does not fail, it just ranks worse.
+    Full price on embeddings costs $2.60 more at 500 questions.
+    """
+    embed = cost("embedding-001", n_questions * CORPUS_TOKENS, 0, batch=False)
     gen = cost(
         model,
         n_questions * GEN_CALLS * GEN_INPUT,
