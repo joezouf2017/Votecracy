@@ -276,4 +276,57 @@ SITTINGS = (
         "national-health-service-lists-of-doctors",
         "NHS (Lists of Doctors)",
     ),
+    # --- outcome: the first full year ---------------------------------------
+    #
+    # 1949, found by walking all 165 of its sitting days. The reveal claims
+    # "5 million dental treatments and 8 million optical appointments in its
+    # first year", and the first full year is where that would have been
+    # reported -- note `national-health-service-dentists` below, which is
+    # directly on it.
+    #
+    # The seventeen debates found include several procedural readings of the
+    # Amendment Bill; those are legislative process rather than evidence of how
+    # the service was working, so what is taken is the service-operation ones.
+    Sitting(
+        "uk-national-health-service-1946",
+        "commons",
+        date(1949, 1, 21),
+        "national-health-service",
+        "National Health Service",
+    ),
+    Sitting(
+        "uk-national-health-service-1946",
+        "commons",
+        date(1949, 2, 9),
+        "national-health-service-doctors-lists",
+        "NHS (Doctors' Lists)",
+    ),
+    Sitting(
+        "uk-national-health-service-1946",
+        "commons",
+        date(1949, 2, 15),
+        "national-health-service-dentists",
+        "NHS (Dentists)",
+    ),
+    Sitting(
+        "uk-national-health-service-1946",
+        "commons",
+        date(1949, 2, 17),
+        "national-health-service-england-and-wales",
+        "NHS (England and Wales)",
+    ),
+    Sitting(
+        "uk-national-health-service-1946",
+        "commons",
+        date(1949, 6, 2),
+        "national-health-service-chiropody",
+        "NHS (Chiropody)",
+    ),
+    Sitting(
+        "uk-national-health-service-1946",
+        "commons",
+        date(1949, 7, 27),
+        "national-health-service-scotland",
+        "National Health Service (Scotland)",
+    ),
 )

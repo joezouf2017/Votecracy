@@ -185,6 +185,61 @@ QUERIES: dict[str, tuple[tuple[str, int], ...]] = {
     # logic, which stays `published_date < decision_date` for every question.
     # This is curation, not a special case in the rule — and it is the reason a
     # question's set is decided by a human before anything is fetched.
+    # --- recent CREC, so the long arc is attributable -------------------------
+    #
+    # These five questions were built entirely from archive.org, whose series
+    # stops in 2008. Their reveals talk about what each programme became, and
+    # nothing in the corpus reached past the decade after the decision.
+    #
+    # CREC runs to the present, so "Medicare covers 67 million people today"
+    # stops being an unsupported assertion and becomes an attributable one:
+    # someone said it in a chamber, on a date, and the claim names them. That is
+    # the whole of rule 1 in `evaluation.md` -- the corpus bounds what may be
+    # asserted, not what period may be discussed.
+    #
+    # Eight granules each, not the hundreds available. A CREC granule averages
+    # ~250 chunks and ACA already carries 9,573 pre-vote against Medicare's
+    # 3,743; the requirement is that a claim have something to cite, not that
+    # the corpus be exhaustive. Queries are aimed at the specific figures each
+    # reveal currently cannot support.
+    "us-medicare-1965": (
+        (
+            'collection:CREC AND "Medicare" AND "beneficiaries" '
+            "AND publishdate:range(2015-01-01,2025-12-31)",
+            8,
+        ),
+    ),
+    "us-income-tax-1913": (
+        (
+            'collection:CREC AND "top marginal" AND "income tax" '
+            "AND publishdate:range(1994-01-01,2025-12-31)",
+            8,
+        ),
+    ),
+    "us-interstate-highway-1956": (
+        (
+            'collection:CREC AND "Interstate Highway System" '
+            "AND publishdate:range(1994-01-01,2025-12-31)",
+            8,
+        ),
+    ),
+    "us-clean-air-act-1970": (
+        (
+            'collection:CREC AND "Clean Air Act" AND "reduced" '
+            "AND publishdate:range(1994-01-01,2025-12-31)",
+            8,
+        ),
+    ),
+    # Only 16 granules exist, so this takes most of them. Congress rarely
+    # revisits Prohibition; what it does discuss is the Twenty-first Amendment
+    # as precedent.
+    "us-prohibition-1919": (
+        (
+            'collection:CREC AND "Prohibition" AND "Twenty-first Amendment" '
+            "AND publishdate:range(1994-01-01,2025-12-31)",
+            8,
+        ),
+    ),
     "us-affordable-care-act-2010": (
         (
             'collection:CREC AND "affordable care act" '
