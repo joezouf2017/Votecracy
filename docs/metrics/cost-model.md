@@ -85,6 +85,43 @@ questions.**
 Cutting the eval plan to fit the free tier would trade the phase's only
 deliverable for less than the price of a sandwich. Pay.
 
+## One gateway or two
+
+OpenRouter carries embeddings as well as chat, including `gemini-embedding-001`
+at the same $0.15/M — they pass provider pricing through without markup. So the
+choice is not "which vendor" but "one integration or two".
+
+What going through OpenRouter costs: **no Batch API**, so every offline figure
+above roughly doubles. Building 500 questions goes $7.32 → ~$14, a weekly full
+eval $2.39 → ~$4.78/month. **About $10 over the life of the project.**
+
+What it buys: one key and one client for four jobs; per-provider privacy
+routing, so providers that train on submitted data can be excluded and a
+request that cannot be routed privately fails rather than leaking; and the
+neutrality judge's "must be a different model family" requirement becomes a
+string change instead of a second vendor integration.
+
+Ten dollars is not worth two integrations. **Use OpenRouter for everything**,
+and if the extra hop hurts the synchronous chatbot's latency, move that one
+path direct — it is the only latency-sensitive caller.
+
+### Do not switch embedding models to save money
+
+The catalogue has models at $0.004–$0.01/M against gemini-embedding-001's
+$0.15, which would take the 500-question embedding line from $2.58 to about
+$0.35. That saving is not real, for two reasons.
+
+Embedding is 35% of a one-off build that costs less than a sandwich, and
+generation dominates it anyway. And the dimension is not a config value:
+`chunk_embeddings.embedding` is `vector(768)` in a migration, so a model that
+does not emit 768 needs a schema change and a full re-embed. `model` sits in
+that table's primary key so two can coexist during a swap — but the column
+width is still fixed.
+
+The one reason that would justify switching is **retrieval quality on OCR'd
+1960s newsprint**, which Set 2's recall@k measures directly. Switch on that
+evidence, never on the price.
+
 ## Caveats worth naming
 
 - **`CHARS_PER_TOKEN = 4` is English-prose optimistic.** OCR of 1965 newsprint
