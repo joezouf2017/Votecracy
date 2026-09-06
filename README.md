@@ -129,6 +129,7 @@ The rest of `docs/` is the reasoning behind the content side:
 | | |
 |---|---|
 | [`candidate-generation.md`](docs/candidate-generation.md) | where questions come from, and why the generator must not see the margin |
+| [`data-acquisition.md`](docs/data-acquisition.md) | where every remaining source comes from, what it costs, and what bites |
 | [`content-audit.md`](docs/content-audit.md) | how each question's `decision_date` was established, and three errors it turned up |
 | [`evaluation.md`](docs/evaluation.md) | how the no-spoiler, grounding and neutrality rules get measured rather than asserted |
 | [`engineering-practices.md`](docs/engineering-practices.md) | what the tooling audit changed, and what it deliberately left alone |
