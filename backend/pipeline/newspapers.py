@@ -174,5 +174,5 @@ def ingest_page(page: Page, decision: date) -> int:
         published_date=page.day,
         content_type="application/json",
         passage=ingest.Passage(0, len(text), text),
-        role="framing" if page.day < decision else "outcome",
+        role=ingest.role_for_date(page.day, decision),
     )

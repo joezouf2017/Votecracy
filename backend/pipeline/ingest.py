@@ -390,3 +390,34 @@ def already_stored(source_key: str, external_id: str, question_id: str) -> bool:
     )
     with db_engine.get_engine().connect() as conn:
         return conn.execute(stmt).scalar_one() > 0
+
+
+# How close to the decision a document has to be to count as its vote record.
+# Wider than a day because a chamber's own report of a vote can appear the
+# following morning, and narrower than a week because everything after that is
+# reaction rather than record.
+VOTE_RECORD_WINDOW_DAYS = 2
+
+
+def role_for_date(published: date, decision: date) -> str:
+    """Classify a document by when it was published, for sources that know
+    their own date exactly.
+
+    Three roles, not two. Everything after the decision used to be labelled
+    `vote_record`, which was harmless while every outcome corpus was days wide
+    and becomes wrong the moment one is widened — a 1948 debate on how the NHS
+    was working is not a record of the 1946 vote.
+
+    Nothing about rule #1 depends on this: post-vote scope ignores `role`
+    entirely. What depends on it is `select_sources`, which routes on need, and
+    a reader trying to tell evidence from aftermath.
+
+    Not usable by `volumes.py`: a bound volume spans weeks and is dated
+    conservatively at its end, so its decision volume can be 19 days "after" a
+    decision it physically contains. That adapter classifies on its span.
+    """
+    if published < decision:
+        return "framing"
+    if (published - decision).days <= VOTE_RECORD_WINDOW_DAYS:
+        return "vote_record"
+    return "outcome"

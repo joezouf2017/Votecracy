@@ -123,7 +123,7 @@ def role_for(sitting: Sitting, decision: date) -> str:
     No conservative rounding is needed. A sitting either predates the decision
     or it does not, and the day it happened is stated rather than inferred.
     """
-    return "framing" if sitting.day < decision else "vote_record"
+    return ingest.role_for_date(sitting.day, decision)
 
 
 def ingest_sitting(sitting: Sitting, decision: date) -> int:
@@ -217,5 +217,63 @@ SITTINGS = (
         date(1946, 5, 2),
         "national-health-service-money",
         "National Health Service (Money)",
+    ),
+    # --- outcome: the launch year -------------------------------------------
+    #
+    # Found by walking all 151 sitting days of 1948, the year the service
+    # actually started (5 July 1948). Before this the NHS outcome corpus was
+    # **zero days wide** — the reveal talked about what the NHS became and the
+    # only post-decision material was the sitting the vote happened in.
+    #
+    # These are `outcome` rather than `vote_record` by derivation: two years
+    # past the decision is aftermath, not a record of the division.
+    Sitting(
+        "uk-national-health-service-1946",
+        "commons",
+        date(1948, 2, 9),
+        "national-health-service",
+        "National Health Service",
+    ),
+    Sitting(
+        "uk-national-health-service-1946",
+        "commons",
+        date(1948, 2, 9),
+        "national-health-service-scotland",
+        "National Health Service (Scotland)",
+    ),
+    Sitting(
+        "uk-national-health-service-1946",
+        "commons",
+        date(1948, 4, 7),
+        "national-health-service-doctors",
+        "National Health Service (Doctors)",
+    ),
+    Sitting(
+        "uk-national-health-service-1946",
+        "commons",
+        date(1948, 5, 3),
+        "national-health-dental-services",
+        "National Health (Dental Services)",
+    ),
+    Sitting(
+        "uk-national-health-service-1946",
+        "commons",
+        date(1948, 6, 23),
+        "national-health-service-regulations",
+        "NHS (Regulations)",
+    ),
+    Sitting(
+        "uk-national-health-service-1946",
+        "commons",
+        date(1948, 6, 23),
+        "national-health-service-scotland",
+        "National Health Service (Scotland)",
+    ),
+    Sitting(
+        "uk-national-health-service-1946",
+        "commons",
+        date(1948, 7, 2),
+        "national-health-service-lists-of-doctors",
+        "NHS (Lists of Doctors)",
     ),
 )

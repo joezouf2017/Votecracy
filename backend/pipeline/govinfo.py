@@ -138,7 +138,7 @@ def fetch(granule: Granule) -> str:
 
 
 def role_for(granule: Granule, decision: date) -> str:
-    return "framing" if granule.day < decision else "vote_record"
+    return ingest.role_for_date(granule.day, decision)
 
 
 def ingest_granule(granule: Granule, decision: date) -> int:
@@ -169,7 +169,7 @@ def ingest_granule(granule: Granule, decision: date) -> int:
 
 # The queries that define each question's set, and the reasoning for their
 # bounds. Pinned here rather than as granule id lists so the *why* survives.
-QUERIES: dict[str, tuple[str, ...]] = {
+QUERIES: dict[str, tuple[tuple[str, int], ...]] = {
     # **The upper bound is 2009-12-23, not the decision date, and that is the
     # point.** This question's decision_date is 2010-03-21, when the House
     # passed the Senate bill 219-212. But the reveal says "Passed the Senate
@@ -186,12 +186,42 @@ QUERIES: dict[str, tuple[str, ...]] = {
     # This is curation, not a special case in the rule — and it is the reason a
     # question's set is decided by a human before anything is fetched.
     "us-affordable-care-act-2010": (
-        'collection:CREC AND "affordable care act" '
-        "AND publishdate:range(2009-09-01,2009-12-23)",
-        # Post-decision, so vote_record and outcome. Without this the question
-        # has framing and nothing else, and the reveal has no source at all.
-        'collection:CREC AND "affordable care act" '
-        "AND publishdate:range(2010-03-21,2010-06-30)",
+        (
+            'collection:CREC AND "affordable care act" '
+            "AND publishdate:range(2009-09-01,2009-12-23)",
+            100,
+        ),
+        (
+            'collection:CREC AND "affordable care act" '
+            "AND publishdate:range(2010-03-21,2010-06-30)",
+            100,
+        ),
+        # --- outcome, sampled rather than taken whole ------------------------
+        #
+        # These three windows hold 761, 1,146 and 164 granules. Taking them all
+        # would repeat the mistake the amendment-text filter was written for:
+        # this question already has 9,573 pre-vote chunks against Medicare's
+        # 3,560, and a CREC granule averages ~250 chunks.
+        #
+        # Fifteen from each is enough for a generated outcome claim to have
+        # something to cite, which is the actual requirement. Ordered by
+        # publish date ascending, so the sample is the start of each window
+        # rather than an arbitrary slice.
+        (
+            'collection:CREC AND "affordable care act" '
+            "AND publishdate:range(2012-06-01,2012-08-31)",  # NFIB v Sebelius
+            15,
+        ),
+        (
+            'collection:CREC AND "affordable care act" '
+            "AND publishdate:range(2013-10-01,2014-03-31)",  # the rollout
+            15,
+        ),
+        (
+            'collection:CREC AND "affordable care act" '
+            "AND publishdate:range(2017-01-01,2017-12-31)",  # the repeal attempt
+            15,
+        ),
     ),
 }
 
@@ -224,6 +254,17 @@ PINNED: dict[str, tuple[Granule, ...]] = {
             "2015-07841",
             "Protecting and Promoting the Open Internet (report and order)",
         ),
+        # 2018-02-22: the repeal. The reveal says the rules were in effect
+        # 2015-2017 and then repealed, and until this landed there was nothing
+        # in the corpus that could support the second half of that sentence.
+        # Found the same way as the 2015 Order — by listing the issue's
+        # granules, because the search index does not return it either.
+        Granule(
+            "us-net-neutrality-2015",
+            "FR-2018-02-22",
+            "2018-03464",
+            "Restoring Internet Freedom (report and order)",
+        ),
     ),
 }
 
@@ -249,8 +290,8 @@ _LANGUAGE_NOT_ARGUMENT = (
 def granules_for(question_id: str) -> list[Granule]:
     """Everything to fetch for a question: pinned first, then searched."""
     found = list(PINNED.get(question_id, ()))
-    for query in QUERIES.get(question_id, ()):
-        for r in search(query):
+    for query, limit in QUERIES.get(question_id, ()):
+        for r in search(query, limit=limit):
             granule = r.get("granuleId")
             title = r.get("title") or granule or ""
             if not granule:

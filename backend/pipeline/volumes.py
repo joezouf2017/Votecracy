@@ -87,7 +87,14 @@ class Volume:
         decision = content.decision_date(self.question_id)
         if decision is None:
             raise ValueError(f"no question {self.question_id!r}")
-        return "framing" if self.ends < decision else "vote_record"
+        if self.ends < decision:
+            return "framing"
+        # The volume physically contains the decision, so it holds the roll
+        # call however conservatively it is dated. A volume that opens after
+        # the decision is aftermath.
+        if self.starts <= decision <= self.ends:
+            return "vote_record"
+        return "outcome"
 
     @property
     def external_id_prefix(self) -> str:
@@ -372,6 +379,58 @@ VOLUMES = (
         "us-clean-air-act-1970",
         date(1970, 5, 14),
         date(1970, 5, 22),
+    ),
+    # --- outcome: what happened after ----------------------------------------
+    #
+    # Every question's outcome corpus was days wide before this -- Medicare 19,
+    # Clean Air 2 -- while their reveals talk about what the programmes became.
+    # A generated outcome claim needs something to be grounded in, and two days
+    # of immediate reaction is not it.
+    #
+    # These classify as `outcome` by derivation: a volume that *opens* after the
+    # decision is aftermath, as against the decision volume, which contains the
+    # roll call however conservatively it is dated.
+    _v(
+        "july-7-1965-july-16-1965_111",
+        "us-medicare-1965",
+        date(1965, 7, 7),
+        date(1965, 7, 16),  # the Senate passes it, 9 July
+    ),
+    _v(
+        "july-19-1965-july-27-1965_111",
+        "us-medicare-1965",
+        date(1965, 7, 19),
+        date(1965, 7, 27),  # conference; signed into law 30 July
+    ),
+    _v(
+        "july-12-20-1966_112",
+        "us-medicare-1965",
+        date(1966, 7, 12),
+        date(1966, 7, 20),  # the programme actually starts, 1 July 1966
+    ),
+    _v(
+        "july-21-august-02-1966_112",
+        "us-medicare-1965",
+        date(1966, 7, 21),
+        date(1966, 8, 2),
+    ),
+    _v(
+        "september-16-22-1970_116",
+        "us-clean-air-act-1970",
+        date(1970, 9, 16),
+        date(1970, 9, 22),  # the Senate passes S.4358, 73-0
+    ),
+    _v(
+        "september-23-30-1970_116",
+        "us-clean-air-act-1970",
+        date(1970, 9, 23),
+        date(1970, 9, 30),
+    ),
+    _v(
+        "december-18-22-1970_116",
+        "us-clean-air-act-1970",
+        date(1970, 12, 18),
+        date(1970, 12, 22),  # conference report; signed 31 December
     ),
 )
 
