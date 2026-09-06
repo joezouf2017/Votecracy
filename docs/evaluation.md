@@ -59,8 +59,43 @@ against each other on purpose.
 The forbidden content for a question is already in the database:
 `tokens(reveal) − tokens(pre-vote material)`. A set difference, not a judgement,
 so the leak check inherits none of the judge's uncertainty. `spoilers.forbidden`
-computes it; on the Medicare question 28 distinct reveal words reduce to 4, and
-the numbers — 307 and 116 — are the high-signal half.
+computes it; on the Medicare question 28 distinct reveal words reduced to 4, and
+the numbers — 307 and 116 — were the high-signal half.
+
+### That check gets weaker as coverage gets better, and it is measured
+
+A set difference shrinks when the thing being subtracted grows. Measured on the
+Medicare question as its pre-vote corpus went from one volume to six:
+
+| pre-vote corpus | words forbidden | numbers forbidden |
+|---|---|---|
+| 184K chars | 4 | 5 |
+| 1M chars | 1 | 3 |
+| **3.05M chars (current)** | **0** | **2** |
+
+The reveal says `Passed 307–116 in the House, 68–21 in the Senate`. At 3M
+characters, **`116`, `97`, `68` and `21` all appear in the pre-vote record** — as
+page numbers, section numbers, other roll calls — so three of the four margin
+figures are no longer flagged. Only `307` survives, because it happens to be
+distinctive.
+
+Nothing is wrong with the arithmetic. The premise is what fails: "a token that
+also appears in the pre-vote record is not a spoiler" is sound for *words* —
+"medicare" and "hospital" are all over the 1965 record — and unsound for
+*numbers*, because a number's meaning is positional. `116` as a page number does
+not make `116` safe in the phrase `307–116`.
+
+**The fix is to stop subtracting for one field.** Every number in
+`reveal.actual_vote` is a margin by construction, so it should be forbidden
+unconditionally rather than net of the corpus. Words keep the set difference;
+`actual_vote`'s numbers stop earning an exemption they cannot deserve.
+
+Worth stating plainly: this is the *backstop*, not the guarantee. Rule #1 holds
+structurally — the generator is only ever shown `framing` chunks, so it cannot
+leak an outcome it was never given. This check exists because "the generator
+could not have known" is an argument, and an argument is not a test. A weakened
+backstop is still worth repairing, but it was never the thing standing between a
+player and the answer.
 
 Seed the set automatically and confirm it once during the human review that is
 happening anyway. Raw extraction picks up noise like "House" and "Senate", which

@@ -321,8 +321,15 @@ have known" is an argument about the pipeline, and an argument is not a test.
 `spoilers.forbidden` is a set difference already sitting in the database:
 `tokens(reveal)` minus `tokens(pre-vote material)`. Words the reveal shares with
 the sources are not spoilers — "medicare" and "hospital" are all over the 1965
-record — and on that question 28 distinct reveal words reduce to 4. The numbers
-are the half that matters: 307 and 116, the House margin.
+record — and on that question 28 distinct reveal words reduced to 4.
+
+**That was measured on a 184K-character corpus, and it does not survive
+growth.** At 3.05M characters the same question forbids 0 words and 2 numbers:
+`116`, `97`, `68` and `21` all turn up in the pre-vote record as page and
+section numbers, leaving only `307`. A set difference shrinks as the subtracted
+side grows, so better coverage weakens this check. The premise holds for words
+and fails for numbers, whose meaning is positional. See
+[`evaluation.md`](evaluation.md) for the measurement and the fix.
 
 Each of these layers has a number attached to it, and the targets pull against
 each other on purpose: [`evaluation.md`](evaluation.md).
