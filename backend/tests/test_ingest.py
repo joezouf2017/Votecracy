@@ -199,3 +199,13 @@ def test_no_chunk_edge_falls_inside_a_word_in_the_source():
                     and source[cut - 1].isalpha()
                     and source[cut].isalpha()
                 ), f"cut at {cut}: {source[cut - 20 : cut + 20]!r}"
+
+
+def test_normalise_strips_nul_bytes():
+    """GovInfo's HTML carries them and Postgres rejects them outright — "text
+    fields cannot contain NUL (0x00) bytes" — so a document with one cannot be
+    stored at all. Stripped in normalise rather than per-adapter because this is
+    the function that defines what stored text is, and a NUL is not part of any
+    source's content under any encoding."""
+    assert "\x00" not in ingest.normalise("before\x00after")
+    assert ingest.normalise("before\x00after") == "beforeafter"

@@ -379,6 +379,10 @@ VOLUMES = (
 def already_ingested(volume: Volume) -> int:
     """How many of this volume's documents are already stored.
 
+    Not `ingest.already_stored`, and the difference is real: one volume becomes
+    many documents (`#p0`, `#p1`, ...), so the question here is "how many", by
+    prefix, not "is this one there".
+
     Re-running the ingest has to be free. `source_documents` is UNIQUE on
     (source_key, external_id), so a second run would raise partway through and
     leave the corpus half-written.

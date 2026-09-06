@@ -345,3 +345,25 @@ def embed_pending(*, batch: int = 200) -> tuple[int, int]:
         done += len(rows)
         log.info("%s: stored %d/%d", model, done, len(todo))
     return done, total - len(todo)
+
+
+def already_stored(source_key: str, external_id: str, question_id: str) -> bool:
+    """Has this exact document been ingested for this question already?
+
+    One implementation rather than the four that had grown up in the adapters,
+    all asking the same question of the same three columns. Those three are also
+    exactly `uq_source_documents_source_external`, so this is the check that
+    corresponds to the constraint — including `question_id`, without which the
+    same volume could not serve a second question at all.
+    """
+    stmt = (
+        select(func.count())
+        .select_from(corpus.source_documents)
+        .where(
+            corpus.source_documents.c.source_key == source_key,
+            corpus.source_documents.c.external_id == external_id,
+            corpus.source_documents.c.question_id == question_id,
+        )
+    )
+    with db_engine.get_engine().connect() as conn:
+        return conn.execute(stmt).scalar_one() > 0

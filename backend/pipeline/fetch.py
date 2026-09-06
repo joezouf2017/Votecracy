@@ -13,6 +13,14 @@ workers that all sleep the same interval come back in lockstep and re-trigger
 the limit together.
 
 **2. A per-host circuit breaker, and this is the one that is not decoration.**
+It is **persisted to disk**, which is not a refinement — an in-process breaker
+would be defeated by the exact sequence it exists to prevent. loc.gov blocks
+you, the run dies or you interrupt it, you start it again, and a fresh process
+begins with an empty breaker: the first thing it does is send a request during
+the block and restart the host's countdown. So the state is written to
+`.cache/http/breakers.json` and read back on load, and `opened_at` is wall-clock
+rather than monotonic, because a monotonic clock's epoch is meaningless across
+a restart.
 loc.gov resets its block countdown on *any* request made during a block, so
 ordinary per-request backoff turns a one-hour block into an indefinite one —
 each polite retry re-arms the timer. The breaker's contract is therefore
@@ -36,8 +44,10 @@ network for what was dropped — deleting a question's documents and re-ingestin
 currently re-downloads every one.
 """
 
+import contextlib
 import hashlib
 import http.client
+import json
 import logging
 import random
 import time
@@ -71,6 +81,19 @@ RETRYABLE = frozenset({429, 500, 502, 503, 504, 520, 521, 522, 523, 524, 525, 52
 # refusing to talk to the host would only prolong the outage.
 BLOCKING = frozenset({403, 429})
 
+# A floor on how often one host is contacted, in seconds. **A floor, not a
+# quota**: it stops a tight loop hammering a source, and it does not enforce
+# GovInfo's 1,000-per-hour gateway cap, which would need a token bucket and a
+# longer memory. Worth having anyway, because for loc.gov the reactive path is
+# the expensive one — a 429 there costs an hour, so not earning it is worth
+# more than reacting well to it.
+MIN_INTERVAL = {
+    "www.loc.gov": 1.0,
+    "api.govinfo.gov": 0.35,
+    "api.parliament.uk": 0.35,
+}
+_last_request: dict[str, float] = {}
+
 CONSECUTIVE_BLOCKS_TO_OPEN = 3
 OPEN_SECONDS = 3600.0  # loc.gov's block is an hour; assume the worst elsewhere
 
@@ -98,15 +121,69 @@ class _Breaker:
     opened_at: float | None = None
 
 
-_breakers: dict[str, _Breaker] = {}
+_BREAKER_STATE = "breakers.json"
+_breakers: dict[str, _Breaker] | None = None
+
+
+def _state_path() -> Path:
+    return CACHE_DIR / _BREAKER_STATE
+
+
+def _load() -> dict[str, _Breaker]:
+    """Read persisted breaker state, tolerating anything unreadable.
+
+    A corrupt or missing file must not stop the pipeline — it degrades to an
+    empty breaker, which is the behaviour before this existed. The failure it
+    protects against is a restart *during* a block, and that is a file that
+    was written seconds ago by a process that then died.
+    """
+    global _breakers
+    if _breakers is not None:
+        return _breakers
+    _breakers = {}
+    try:
+        raw = json.loads(_state_path().read_text())
+        for host, value in raw.items():
+            _breakers[host] = _Breaker(
+                consecutive_blocks=int(value.get("consecutive_blocks", 0)),
+                opened_at=value.get("opened_at"),
+            )
+    except (OSError, ValueError, AttributeError):
+        pass
+    return _breakers
+
+
+def _save() -> None:
+    """Write only the hosts that are open or part-way there.
+
+    A closed breaker is the default, so persisting it would grow the file with
+    every host ever contacted for no benefit.
+    """
+    state = {
+        host: {"consecutive_blocks": b.consecutive_blocks, "opened_at": b.opened_at}
+        for host, b in (_breakers or {}).items()
+        if b.opened_at is not None or b.consecutive_blocks
+    }
+    try:
+        path = _state_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(state))
+    except OSError:  # a cache we cannot write is not a reason to stop fetching
+        log.warning("could not persist circuit-breaker state to %s", _state_path())
 
 
 @dataclass
 class _Clock:
     """Injectable so the breaker's state machine is testable without waiting an
-    hour, which is exactly why the real behaviour has never been observed."""
+    hour, which is exactly why the real behaviour has never been observed.
 
-    now: object = field(default=time.monotonic)
+    `now` is wall-clock, not monotonic. Monotonic would be the better choice for
+    in-process timing and is the wrong one here: the breaker is persisted across
+    restarts, and a monotonic reading from a dead process means nothing to a
+    live one.
+    """
+
+    now: object = field(default=time.time)
     sleep: object = field(default=time.sleep)
 
 
@@ -114,8 +191,12 @@ clock = _Clock()
 
 
 def reset() -> None:
-    """Forget every breaker. For tests, and for a deliberate operator override."""
-    _breakers.clear()
+    """Forget every breaker, on disk as well. For tests, and for a deliberate
+    operator override when a host is known to be available again."""
+    global _breakers
+    _breakers = {}
+    with contextlib.suppress(OSError):
+        _state_path().unlink(missing_ok=True)
 
 
 def _host(url: str) -> str:
@@ -123,7 +204,7 @@ def _host(url: str) -> str:
 
 
 def _check_closed(host: str) -> None:
-    breaker = _breakers.get(host)
+    breaker = _load().get(host)
     if breaker is None or breaker.opened_at is None:
         return
     elapsed = clock.now() - breaker.opened_at
@@ -138,14 +219,16 @@ def _check_closed(host: str) -> None:
     # window, so the cooldown is measured from the last refusal.
     breaker.opened_at = None
     breaker.consecutive_blocks = CONSECUTIVE_BLOCKS_TO_OPEN - 1
+    _save()
     log.info("%s: circuit half-open, sending one probe", host)
 
 
 def _record(host: str, *, blocked: bool) -> None:
-    breaker = _breakers.setdefault(host, _Breaker())
+    breaker = _load().setdefault(host, _Breaker())
     if not blocked:
         breaker.consecutive_blocks = 0
         breaker.opened_at = None
+        _save()
         return
     breaker.consecutive_blocks += 1
     if breaker.consecutive_blocks >= CONSECUTIVE_BLOCKS_TO_OPEN:
@@ -156,6 +239,18 @@ def _record(host: str, *, blocked: bool) -> None:
             breaker.consecutive_blocks,
             OPEN_SECONDS,
         )
+    _save()
+
+
+def _wait_turn(host: str) -> None:
+    """Hold off until this host's minimum interval has passed."""
+    floor = MIN_INTERVAL.get(host)
+    if not floor:
+        return
+    since = clock.now() - _last_request.get(host, 0.0)
+    if since < floor:
+        clock.sleep(floor - since)
+    _last_request[host] = clock.now()
 
 
 def _cache_path(key: str) -> Path:
@@ -195,6 +290,7 @@ def request(
 
     for attempt in range(MAX_ATTEMPTS):
         _check_closed(host)  # before every attempt, including retries
+        _wait_turn(host)
         try:
             with urllib.request.urlopen(  # noqa: S310
                 urllib.request.Request(url, data=data, headers=sent), timeout=timeout

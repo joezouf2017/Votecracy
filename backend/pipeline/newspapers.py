@@ -47,8 +47,6 @@ from datetime import date
 
 from pipeline import fetch as http
 from pipeline import ingest
-from shared.db import corpus
-from shared.db import engine as db_engine
 
 log = logging.getLogger(__name__)
 
@@ -153,23 +151,13 @@ def pages_for(question_id: str, query: dict, *, per_term: int = 20) -> list[Page
     return list(seen.values())
 
 
-def already_ingested(page: Page) -> int:
-    stmt = corpus.source_documents.select().where(
-        corpus.source_documents.c.source_key == SOURCE_KEY,
-        corpus.source_documents.c.external_id == page.external_id,
-        corpus.source_documents.c.question_id == page.question_id,
-    )
-    with db_engine.get_engine().connect() as conn:
-        return len(conn.execute(stmt).fetchall())
-
-
 def ingest_page(page: Page, decision: date) -> int:
     if page.day > COVERAGE_END:
         raise NewspaperError(
             f"{page.external_id} is dated {page.day}, past Chronicling America's "
             f"{COVERAGE_END} public-domain cutoff"
         )
-    if already_ingested(page):
+    if ingest.already_stored(SOURCE_KEY, page.external_id, page.question_id):
         return 0
     text = ingest.normalise(page.text)
     return ingest.store_passage(

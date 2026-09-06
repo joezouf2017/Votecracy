@@ -115,7 +115,7 @@ def test_a_server_fault_does_not_trip_the_breaker(calls):
     seen = calls(*[_http_error(500)] * 20)
     with pytest.raises(fetch.FetchError):
         fetch.request("https://api.govinfo.gov/a", cache=False)
-    assert fetch._breakers["api.govinfo.gov"].opened_at is None
+    assert fetch._load()["api.govinfo.gov"].opened_at is None
     # And it does spend all its attempts, unlike the blocking case above.
     assert len(seen) == fetch.MAX_ATTEMPTS
 
@@ -139,7 +139,7 @@ def test_the_breaker_closes_after_the_cooldown_and_probes_once(calls, monkeypatc
 def test_a_success_resets_the_failure_count(calls):
     calls(_http_error(429), _Response(), *[_http_error(429)] * 10)
     fetch.request("https://loc.gov/a", cache=False)  # retries once, then succeeds
-    assert fetch._breakers["loc.gov"].consecutive_blocks == 0
+    assert fetch._load()["loc.gov"].consecutive_blocks == 0
 
 
 # --- content-type validation --------------------------------------------------
@@ -227,7 +227,7 @@ def test_a_cloudflare_520_is_retried_and_does_not_trip_the_breaker(calls):
     seen = calls(_http_error(520), _http_error(522), _Response(b"through"))
     assert fetch.request("https://www.loc.gov/x", cache=False) == b"through"
     assert len(seen) == 3
-    assert fetch._breakers["www.loc.gov"].opened_at is None
+    assert fetch._load()["www.loc.gov"].opened_at is None
 
 
 def test_a_dropped_connection_is_retried(calls):
@@ -244,4 +244,71 @@ def test_a_dropped_connection_is_retried(calls):
     )
     assert fetch.request("https://www.loc.gov/x", cache=False) == b"complete"
     assert len(seen) == 3
-    assert fetch._breakers.get("www.loc.gov", fetch._Breaker()).opened_at is None
+    assert fetch._load().get("www.loc.gov", fetch._Breaker()).opened_at is None
+
+
+def test_the_breaker_survives_a_process_restart(calls, monkeypatch):
+    """The sequence an in-process breaker cannot survive, and the reason this
+    is persisted at all.
+
+    loc.gov blocks you, the run dies or you interrupt it, and you start again.
+    A fresh process with an empty breaker sends a request *during* the block —
+    which is what restarts loc.gov's countdown and turns an hour into forever.
+    """
+    now = [1000.0]
+    monkeypatch.setattr(fetch.clock, "now", lambda: now[0])
+    seen = calls(*[_http_error(429)] * fetch.CONSECUTIVE_BLOCKS_TO_OPEN, _Response())
+
+    with pytest.raises(fetch.CircuitOpen):
+        fetch.request("https://loc.gov/a", cache=False)
+    sent = len(seen)
+
+    # Simulate the restart: drop every scrap of in-process state.
+    fetch._breakers = None
+
+    with pytest.raises(fetch.CircuitOpen):
+        fetch.request("https://loc.gov/b", cache=False)
+    assert len(seen) == sent, "the new process sent a request during the block"
+
+    # And it still reopens on schedule rather than staying shut forever.
+    now[0] += fetch.OPEN_SECONDS + 1
+    fetch._breakers = None
+    assert fetch.request("https://loc.gov/c", cache=False) == b"ok"
+
+
+def test_an_unreadable_state_file_degrades_to_an_empty_breaker(calls, tmp_path):
+    """A cache we cannot parse must not stop the pipeline; it should behave
+    exactly as it did before the file existed."""
+    calls(_Response(b"fine"))
+    (tmp_path / "http").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "http" / fetch._BREAKER_STATE).write_text("{ not json")
+    fetch._breakers = None
+    assert fetch.request("https://x/y", cache=False) == b"fine"
+
+
+def test_a_host_with_a_floor_is_made_to_wait(calls, monkeypatch):
+    """A floor, not a quota. It stops a tight loop hammering a source and does
+    not enforce GovInfo's hourly cap — but for loc.gov the reactive path costs
+    an hour, so not earning a 429 is worth more than handling one well."""
+    now = [1000.0]
+    slept = []
+    monkeypatch.setattr(fetch.clock, "now", lambda: now[0])
+    monkeypatch.setattr(fetch.clock, "sleep", lambda s: slept.append(s))
+    monkeypatch.setitem(fetch.MIN_INTERVAL, "slow.example", 5.0)
+    fetch._last_request.clear()
+    calls(_Response(), _Response())
+
+    fetch.request("https://slow.example/a", cache=False)
+    assert slept == []  # first contact waits for nothing
+    fetch.request("https://slow.example/b", cache=False)
+    assert slept == [5.0]
+
+
+def test_a_host_with_no_floor_is_not_delayed(calls, monkeypatch):
+    slept = []
+    monkeypatch.setattr(fetch.clock, "sleep", lambda s: slept.append(s))
+    fetch._last_request.clear()
+    calls(_Response(), _Response())
+    fetch.request("https://fast.example/a", cache=False)
+    fetch.request("https://fast.example/b", cache=False)
+    assert slept == []

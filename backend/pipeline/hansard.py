@@ -41,8 +41,6 @@ from datetime import date
 
 from pipeline import fetch as http
 from pipeline import ingest
-from shared.db import corpus
-from shared.db import engine as db_engine
 
 log = logging.getLogger(__name__)
 
@@ -119,16 +117,6 @@ def fetch(sitting: Sitting) -> str:
     return http.request(sitting.url, expect=("text/html",)).decode("utf-8", "replace")
 
 
-def already_ingested(sitting: Sitting) -> int:
-    stmt = corpus.source_documents.select().where(
-        corpus.source_documents.c.source_key == SOURCE_KEY,
-        corpus.source_documents.c.external_id == sitting.external_id,
-        corpus.source_documents.c.question_id == sitting.question_id,
-    )
-    with db_engine.get_engine().connect() as conn:
-        return len(conn.execute(stmt).fetchall())
-
-
 def role_for(sitting: Sitting, decision: date) -> str:
     """Derived from the sitting's own date, which is exact.
 
@@ -140,7 +128,7 @@ def role_for(sitting: Sitting, decision: date) -> str:
 
 def ingest_sitting(sitting: Sitting, decision: date) -> int:
     """Fetch, strip, chunk and store one debate. Returns chunks written."""
-    if already_ingested(sitting):
+    if ingest.already_stored(SOURCE_KEY, sitting.external_id, sitting.question_id):
         log.info("%s already stored; skipping", sitting.path)
         return 0
 

@@ -30,8 +30,6 @@ from datetime import date
 
 from pipeline import fetch as http
 from pipeline import ingest
-from shared.db import corpus
-from shared.db import engine as db_engine
 from shared.settings import get_settings
 
 log = logging.getLogger(__name__)
@@ -139,22 +137,12 @@ def fetch(granule: Granule) -> str:
     return _SPACES.sub(" ", _TAGS.sub(" ", _SCRIPTS.sub(" ", raw)))
 
 
-def already_ingested(granule: Granule) -> int:
-    stmt = corpus.source_documents.select().where(
-        corpus.source_documents.c.source_key == SOURCE_KEY,
-        corpus.source_documents.c.external_id == granule.external_id,
-        corpus.source_documents.c.question_id == granule.question_id,
-    )
-    with db_engine.get_engine().connect() as conn:
-        return len(conn.execute(stmt).fetchall())
-
-
 def role_for(granule: Granule, decision: date) -> str:
     return "framing" if granule.day < decision else "vote_record"
 
 
 def ingest_granule(granule: Granule, decision: date) -> int:
-    if already_ingested(granule):
+    if ingest.already_stored(SOURCE_KEY, granule.external_id, granule.question_id):
         return 0
     text = ingest.normalise(fetch(granule))
     document_id = ingest.store_passage(
