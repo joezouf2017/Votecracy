@@ -220,6 +220,78 @@ VOLUMES = (
         date(1917, 12, 3),
         date(1918, 1, 19),  # and the House 17 December
     ),
+    # --- the rest of each debate ---------------------------------------------
+    #
+    # Selected by legislative history and confirmed by term density, not by
+    # proximity to the decision date. The volume nearest the vote is often the
+    # weakest: Medicare's 1962 volume outscores the one it was first built from
+    # by 3.9x, because that is where King-Anderson died 52-48.
+    _v(
+        "august-19-1960-august-27-1960_106",
+        "us-medicare-1965",
+        date(1960, 8, 19),
+        date(1960, 8, 27),  # Forand bill and the Anderson-Kennedy amendment
+    ),
+    _v(
+        "july-9-19-1962_108",
+        "us-medicare-1965",
+        date(1962, 7, 9),
+        date(1962, 7, 19),  # King-Anderson defeated 52-48, 17 July
+    ),
+    _v(
+        "august-20-september-8-1964_110",
+        "us-medicare-1965",
+        date(1964, 8, 20),
+        date(1964, 9, 8),  # the Gore amendment
+    ),
+    _v(
+        "january-4-1965-january-27-1965_111",
+        "us-medicare-1965",
+        date(1965, 1, 4),
+        date(1965, 1, 27),
+    ),
+    _v(
+        "march-5-1965-march-23-1965_111",
+        "us-medicare-1965",
+        date(1965, 3, 5),
+        date(1965, 3, 23),
+    ),
+    _v(
+        "may-5-25-1955_101",
+        "us-interstate-highway-1956",
+        date(1955, 5, 5),
+        date(1955, 5, 25),  # the Gore bill, S. 1048
+    ),
+    _v(
+        "july-20-29-1955_101",
+        "us-interstate-highway-1956",
+        date(1955, 7, 20),
+        date(1955, 7, 29),  # Fallon H.R. 4260 and the Clay Committee
+    ),
+    _v(
+        "january-03-26-1956_102",
+        "us-interstate-highway-1956",
+        date(1956, 1, 3),
+        date(1956, 1, 26),
+    ),
+    _v(
+        "january-27-february-17-1956_102",
+        "us-interstate-highway-1956",
+        date(1956, 1, 27),
+        date(1956, 2, 17),
+    ),
+    _v(
+        "february-20-march-07-1956_102",
+        "us-interstate-highway-1956",
+        date(1956, 2, 20),
+        date(1956, 3, 7),
+    ),
+    _v(
+        "march-08-27-1956_102",
+        "us-interstate-highway-1956",
+        date(1956, 3, 8),
+        date(1956, 3, 27),
+    ),
 )
 
 

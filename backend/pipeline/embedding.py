@@ -49,11 +49,24 @@ log = logging.getLogger(__name__)
 ENDPOINT = "https://openrouter.ai/api/v1/embeddings"
 
 # How many texts go in one request. OpenRouter accepts an array on `input` and
-# embeds every element in one call. 10 was measured against Google's free tier,
-# where a batch of 50 drew a 429 while single requests succeeded — the limit
-# bit on batch size rather than request count. The gateway's limits are its
-# own, so this is a starting point to re-measure, not a finding.
-BATCH_SIZE = 10
+# embeds every element in one call.
+#
+# This was 10, inherited from Google's free tier where a batch of 50 drew a 429
+# while single requests succeeded. The comment here said the gateway's limits
+# were its own and this needed re-measuring; it then went un-remeasured until a
+# 4,339-chunk run took 20 minutes and made the point.
+#
+# Measured through OpenRouter on real chunk text, 2026-09-05:
+#
+#            batch 10   batch 50   batch 100   batch 200
+#   qwen3      10 c/s     56 c/s      69 c/s      98 c/s
+#   gemini     15 c/s     35 c/s      44 c/s      54 c/s
+#
+# The cost of a request is almost entirely the round trip, so this is nearly
+# linear until something else binds. Nothing did at 200. A failed batch loses
+# only itself — `embed_pending` inserts per batch — so the downside of a larger
+# one is bounded.
+BATCH_SIZE = 200
 
 # A 429 is a rate limit, not a failure: the same request succeeds shortly. What
 # must not happen is retrying immediately — loc.gov resets its block countdown
