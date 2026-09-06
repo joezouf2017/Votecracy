@@ -29,6 +29,7 @@ from datetime import UTC, date, datetime
 
 from sqlalchemy import func, select
 
+from shared import content
 from shared.db import corpus
 from shared.db import engine as db_engine
 from shared.settings import get_settings
@@ -245,6 +246,28 @@ def store_passage(
     if role not in corpus.CHUNK_ROLES:
         raise ValueError(
             f"unknown role {role!r}; expected one of {sorted(corpus.CHUNK_ROLES)}"
+        )
+
+    # A `framing` chunk dated on or after the decision cannot be written at all.
+    #
+    # Rule #1's predicate is a conjunction, so such a row could never *reach* a
+    # player — the date clause excludes it whatever the role says. This refuses
+    # it one step earlier, at the only place documents are created, because the
+    # conjunction protects the reader and not the corpus: a row like this means
+    # a source reported a date the pipeline believed, and the next thing built
+    # on top may not be a conjunction.
+    #
+    # Deliberately one-directional. `vote_record` *before* the decision is
+    # legitimate and is exactly why `role` exists — a rejected amendment's
+    # counts are published while the bill is still live.
+    decision = content.decision_date(question_id)
+    if decision is None:
+        raise ValueError(f"no question {question_id!r}, so no boundary to check")
+    if role == "framing" and published_date >= decision:
+        raise ValueError(
+            f"refusing to store {external_id!r} as framing: published "
+            f"{published_date}, on or after the decision {decision}. Framing "
+            "material is what was available before the vote."
         )
 
     digest = hashlib.sha256(passage.text.encode("utf-8")).hexdigest()

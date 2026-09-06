@@ -322,3 +322,48 @@ def test_a_whole_chunk_is_too_large_to_be_a_citation():
     whole-chunk citation legal.
     """
     assert grounding.MAX_SPAN_CHARS < ingest.CHUNK_CHARS
+
+
+def test_adding_post_vote_material_never_changes_pre_vote_scope(corpus_rows, sqlite_db):
+    """Widening the outcome window cannot leak, and this is why.
+
+    The pre-vote predicate is a conjunction, so a document dated on or after the
+    decision fails its first clause whatever its `role` says. That means the
+    outcome corpus can be extended by decades — which it needs to be, since most
+    questions' outcome material currently spans days — without any of it
+    becoming reachable before a player votes.
+
+    Pinned because the reasoning is easy to state and easy to lose. The obvious
+    worry is "more material, more chance of a leak", and the answer is that the
+    date clause makes the amount irrelevant.
+    """
+    before = [c.id for c in retrieval.chunks(QID, retrieval.Scope.PRE_VOTE)]
+
+    with sqlite_db.begin() as conn:
+        # Deliberately hostile: post-decision documents mislabelled `framing`,
+        # containing the exact margin the reveal cites.
+        for n, day in enumerate((date(1965, 4, 9), date(1975, 1, 1), AFTER), start=90):
+            _document(
+                conn,
+                doc_id=n,
+                published_date=day,
+                text="Medicare passed 307 to 116 and now covers 67 million.",
+            )
+            _chunk(
+                conn,
+                doc_id=n,
+                ordinal=0,
+                role="framing",
+                published_date=day,
+                start=0,
+                end=52,
+                text="Medicare passed 307 to 116 and now covers 67 million.",
+            )
+
+    after = [c.id for c in retrieval.chunks(QID, retrieval.Scope.PRE_VOTE)]
+    assert after == before, "post-decision material reached pre-vote scope"
+
+    text = retrieval.scope_text(QID, retrieval.Scope.PRE_VOTE)
+    assert "307" not in text and "67 million" not in text
+    # And it is genuinely there, on the other side of the boundary.
+    assert len(retrieval.chunks(QID, retrieval.Scope.POST_VOTE)) >= 3

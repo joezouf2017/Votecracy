@@ -5,6 +5,8 @@ Solitary: these are text functions. The one that touches the database
 suite uses, via the autouse fixtures in conftest.
 """
 
+from datetime import date
+
 import pytest
 
 from pipeline import ingest
@@ -209,3 +211,40 @@ def test_normalise_strips_nul_bytes():
     source's content under any encoding."""
     assert "\x00" not in ingest.normalise("before\x00after")
     assert ingest.normalise("before\x00after") == "beforeafter"
+
+
+def test_a_framing_chunk_dated_after_the_decision_cannot_be_written(sqlite_db):
+    """Rule #1's predicate is a conjunction, so such a row could never reach a
+    player anyway. It is refused here because the conjunction protects the
+    *reader*, not the corpus — a row like this means a source reported a date
+    the pipeline believed, and the next thing built on top may not be a
+    conjunction."""
+    with pytest.raises(ValueError, match="refusing to store .* as framing"):
+        ingest.store_passage(
+            question_id="us-medicare-1965",
+            source_key="test",
+            external_id="x#p0",
+            url="https://example.invalid/",
+            title=None,
+            published_date=date(1965, 4, 8),  # the decision date itself
+            content_type="text/plain",
+            passage=ingest.Passage(0, 5, "hello"),
+            role="framing",
+        )
+
+
+def test_a_vote_record_before_the_decision_is_still_allowed(sqlite_db):
+    """One-directional on purpose: a rejected amendment's counts are published
+    while the bill is still live, and that is exactly why `role` exists."""
+    doc = ingest.store_passage(
+        question_id="us-medicare-1965",
+        source_key="test",
+        external_id="y#p0",
+        url="https://example.invalid/",
+        title=None,
+        published_date=date(1965, 4, 1),
+        content_type="text/plain",
+        passage=ingest.Passage(0, 24, "The amendment failed 128."),
+        role="vote_record",
+    )
+    assert doc > 0
