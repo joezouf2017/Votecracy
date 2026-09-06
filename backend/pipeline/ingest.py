@@ -55,8 +55,20 @@ PASSAGE_RADIUS = 1500
 
 
 def normalise(text: str) -> str:
-    """The canonical form. Offsets in the database refer to this, not the raw."""
-    return _RUNS_OF_SPACE.sub(" ", _SOFT_HYPHEN.sub(r"\1\2", text))
+    """The canonical form. Offsets in the database refer to this, not the raw.
+
+    NUL bytes go first, and unconditionally. GovInfo's HTML carries them, and
+    Postgres rejects them outright — "text fields cannot contain NUL (0x00)
+    bytes" — so a document containing one cannot be stored at all. Stripping
+    here rather than in the GovInfo adapter is deliberate: this is the function
+    that defines what stored text *is*, and a NUL is not part of any source's
+    content under any encoding. Doing it per-adapter would mean the next source
+    to deliver one fails the same way.
+
+    Offsets are unaffected. Everything downstream chunks and cites against this
+    return value, never against the raw bytes.
+    """
+    return _RUNS_OF_SPACE.sub(" ", _SOFT_HYPHEN.sub(r"\1\2", text.replace("\x00", "")))
 
 
 @dataclass(frozen=True)

@@ -73,10 +73,36 @@ The amendment division is worth noting on its own: a defeated amendment's
 counts, published on the decision date, are exactly the `vote_record` case the
 `role` column exists for.
 
-**`us-affordable-care-act-2010` — a residual leak window.** The Senate passed
-H.R. 3590 on 2009-12-24 by 60–39, and the reveal cites exactly that number.
-The boundary is 2010-03-21, so reporting from January to March 2010 sits in
-pre-vote scope and discusses a vote the reveal treats as the outcome.
+**`us-affordable-care-act-2010` — the leak is not a window, and no fetch bound
+closes it.** Measured 2026-09-05 against the CREC material now ingested.
+
+This was recorded as a window: the Senate passed 60–39 on 2009-12-24, the
+boundary is 2010-03-21, so January-to-March reporting sits in pre-vote scope and
+discusses a vote the reveal treats as the outcome. The fix looked like cutting
+the fetch at 23 December.
+
+It does not work, because **the 60–39 margin was public from 21 November 2009**.
+The Senate took three cloture votes on the bill and every one of them carried
+the same margin as the final passage:
+
+| date | roll call | result |
+|---|---|---|
+| 2009-11-21 | No. 353 | yeas 60, nays 39 |
+| 2009-12-22 | No. 386 | yeas 60, nays 39 |
+| 2009-12-23 | No. 394 | yeas 60, nays 39 |
+
+All three are four months inside the framing window and cannot be excluded
+without excluding the Senate debate itself, which *is* the framing material.
+
+**So this is a content problem, not a retrieval one.** The reveal says "Passed
+the Senate 60–39, House 219–212". The decision this question asks the player
+about is the House vote of 2010-03-21; the Senate's 60–39 is run-up, not
+outcome, and presenting it as outcome is what creates the leak. `219–212` is
+absent from the pre-vote corpus and stays absent — that number is safe.
+
+**Recommended: cut the Senate figure from `reveal.actual_vote`.** Left for a
+decision because it changes what a player sees, which is the one thing this
+pipeline should not change on its own.
 
 This is deliberate — the prompt says "It's 2010", and a 2009 boundary would
 leave the question with no framing corpus at all. But it means this question
