@@ -117,6 +117,28 @@ WHITELIST: tuple[Source, ...] = (
         collection="STATUTE",
     ),
     Source(
+        key="hansard",
+        # Historic Hansard, 1803-2005. The first non-US source, and so the first
+        # thing `jurisdictions` has had to actually discriminate on rather than
+        # merely record.
+        #
+        # It serves every need for a parliamentary division because one debate
+        # on one named day is separately addressable — the division itself is in
+        # the sitting, and so is the debate that preceded it. That is a stronger
+        # claim than any US source can make: the Congressional Record's bound
+        # volumes bundle two to three weeks together, so `published_date` there
+        # is a conservative guess and here it is a fact.
+        #
+        # Same `outcome` caveat as the Record, for the same reason: what was
+        # said about effects is not evidence of them.
+        serves=_serves(
+            {"framing", "vote_record", "outcome"}, {"parliamentary_division"}
+        ),
+        coverage_start=date(1803, 1, 1),
+        coverage_end=date(2005, 12, 31),
+        jurisdictions=frozenset({"UK"}),
+    ),
+    Source(
         key="loc:chronicling-america",
         # Digitised newspapers. Not restricted by vote_type — a newspaper covers
         # whatever happened — but hard-stopped at 1963 by copyright, which is

@@ -97,4 +97,23 @@ def formulate_query(question: dict, source: Source, need: str) -> dict:
         # and only the response can settle it.
         return {"q": terms, "dates": f"{start}/{end}", "fo": "json"}
 
+    if source.key == "hansard":
+        # Hansard is browsed, not searched: there is no query endpoint taking
+        # terms and a date range. What it has is a sittings index per day, and
+        # sections addressed under it — so the "query" is the window to walk,
+        # and `pipeline/hansard.py` does the walking.
+        #
+        # That is a better position than it sounds. Every other source here
+        # returns records whose dates have to be re-checked on arrival, because
+        # a date parameter the API accepts is not one it honours. Here the date
+        # is the address: a sitting fetched from `/commons/1946/apr/30/...` is
+        # from 30 April 1946 or it is a 404. The boundary cannot be got wrong by
+        # trusting a filter, because there is no filter to trust.
+        return {
+            "house": "commons",
+            "from": start,
+            "to": end,
+            "terms": retrieval["search_terms"],
+        }
+
     raise ValueError(f"no query shape defined for source {source.key!r}")

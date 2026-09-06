@@ -32,6 +32,7 @@ _CREC = "govinfo:crec"
 _STATUTE = "govinfo:statute"
 _LOC = "loc:chronicling-america"
 _VOTEVIEW = "voteview"
+_HANSARD = "hansard"
 
 MATRIX = {
     ("us-medicare-1965", "framing"): (_CRECB, _STATUTE, _LOC),
@@ -61,10 +62,14 @@ MATRIX = {
     ("us-income-tax-1913", "framing"): (_CRECB, _STATUTE, _LOC),
     ("us-income-tax-1913", "vote_record"): RAISE,
     ("us-income-tax-1913", "outcome"): (_CRECB, _CREC, _LOC),
-    # No UK source of any kind yet — Hansard isn't wired up.
-    ("uk-national-health-service-1946", "framing"): RAISE,
-    ("uk-national-health-service-1946", "vote_record"): RAISE,
-    ("uk-national-health-service-1946", "outcome"): RAISE,
+    # Historic Hansard, wired up 2026-09-05. The only question served by a
+    # non-US source, and the only one whose vote_record comes from the same
+    # place as its framing — a Hansard sitting is one debate on one named day,
+    # so the division and the debate that preceded it are separately
+    # addressable rather than bundled into a fortnight's volume.
+    ("uk-national-health-service-1946", "framing"): (_HANSARD,),
+    ("uk-national-health-service-1946", "vote_record"): (_HANSARD,),
+    ("uk-national-health-service-1946", "outcome"): (_HANSARD,),
 }
 
 
@@ -105,14 +110,20 @@ def test_select_sources_is_never_empty(question, need):
 
 
 def test_no_source_available_says_why_each_candidate_lost():
-    """ "No UK source at all" and "no source for ratification votes" are
-    different gaps. An exception that only says "none" hides the difference."""
-    question = content.get_question("uk-national-health-service-1946")
+    """ "No source for this jurisdiction" and "no source for ratification
+    votes" are different gaps. An exception that only says "none" hides the
+    difference.
+
+    Uses net neutrality now that Hansard covers the UK question. Every US
+    source loses on vote_type here rather than on jurisdiction, which is the
+    other half of the same distinction.
+    """
+    question = content.get_question("us-net-neutrality-2015")
     with pytest.raises(sources.NoSourceAvailable) as exc:
         sources.select_sources(question, "framing")
     assert set(exc.value.reasons) == {s.key for s in sources.WHITELIST}
-    assert all("jurisdiction UK" in why for why in exc.value.reasons.values())
-    assert "uk-national-health-service-1946" in str(exc.value)
+    assert "us-net-neutrality-2015" in str(exc.value)
+    assert "jurisdiction US" in exc.value.reasons["hansard"]
 
 
 def test_no_source_available_distinguishes_a_vote_type_gap_from_a_jurisdiction_one():

@@ -56,13 +56,22 @@ and [Senate #396 2009](https://www.govtrack.us/congress/votes/111-2009/s396);
 [Hansard, NHS Bill, 2 May 1946](https://api.parliament.uk/historic-hansard/commons/1946/may/02/national-health-service-bill);
 Voteview for the Clean Air Act margin.
 
-### Two of these need a second look
+### One of these needed a second look, and got it
 
-**`uk-national-health-service-1946` — day not confirmed.** The 359–172 division
-figure is solid, and Hansard shows the second reading debate running 30 April,
-1 May and 2 May 1946, with the division at the close. 2 May is an inference
-from the debate's shape, not a reading of the division record. Confirm against
-Hansard's own division listing before this question's sources are fetched.
+**`uk-national-health-service-1946` — confirmed 2026-09-05.** This was recorded
+as an inference: the 359–172 figure was solid and the second reading ran across
+30 April, 1 May and 2 May 1946, but 2 May came from the debate's shape rather
+than from a division record.
+
+Read directly from Hansard now that the adapter exists —
+`/commons/1946/may/02/national-health-service-bill` contains
+**`Ayes, 359; Noes, 172`**, and a second division at `Ayes, 180; Noes, 344` for
+the defeated opposition amendment. `decision_date` 1946-05-02 stands, and it is
+now a reading rather than an inference.
+
+The amendment division is worth noting on its own: a defeated amendment's
+counts, published on the decision date, are exactly the `vote_record` case the
+`role` column exists for.
 
 **`us-affordable-care-act-2010` — a residual leak window.** The Senate passed
 H.R. 3590 on 2009-12-24 by 60–39, and the reveal cites exactly that number.
@@ -111,16 +120,21 @@ routing table does today, not what it was meant to do.
 | `us-net-neutrality-2015` | **raises** | **raises** | **raises** |
 | `us-affordable-care-act-2010` | `govinfo:crecb`, `govinfo:crec`, `govinfo:statute` | `voteview`, `govinfo:crecb`, `govinfo:crec` | `govinfo:crecb`, `govinfo:crec` |
 | `us-income-tax-1913` | `govinfo:crecb`, `govinfo:statute`, `loc:chronicling-america` | **raises** | `govinfo:crecb`, `govinfo:crec`, `loc:chronicling-america` |
-| `uk-national-health-service-1946` | **raises** | **raises** | **raises** |
+| `uk-national-health-service-1946` | `hansard` | `hansard` | `hansard` |
 
-Eight of the twenty-four cells raise. That is Step 3's designed output, not a
+Five of the twenty-four cells raise. That is Step 3's designed output, not a
 defect list to burn down before moving on:
 
 - **`us-net-neutrality-2015`** raises for everything. It is an `agency_rule`
   and there is no FCC source in the whitelist; the one source not restricted
   by `vote_type` (Chronicling America) stops 52 years before the decision.
-- **`uk-national-health-service-1946`** raises for everything. Every source in
-  the whitelist is US-only, and Hansard isn't wired up.
+- **`uk-national-health-service-1946`** no longer raises. Hansard was wired up
+  on 2026-09-05 and serves all three needs, which no other source does for any
+  question — a Hansard sitting is one debate on one named day, so the division
+  and the debate that preceded it are separately addressable instead of bundled
+  into a fortnight's bound volume. It is also the first non-US source, and so
+  the first thing `jurisdictions` has had to discriminate on rather than
+  merely record.
 - **`us-prohibition-1919`** and **`us-income-tax-1913`** raise for
   `vote_record` alone. Framing and outcome are fine; what's missing is the
   *deciding* vote, because both reveals cite state ratification and every

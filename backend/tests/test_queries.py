@@ -64,6 +64,27 @@ def _framing_queries():
                 yield q, source
 
 
+def _dates_in(value):
+    """Every date a query carries, whatever key or format it hides under.
+
+    Sources spell their bounds differently — `published_to`, `dates=FROM/TO`,
+    `to` — and will keep doing so. Walking the structure means a source added
+    later is covered by the rule below without anyone remembering to extend it.
+    """
+    if isinstance(value, date):
+        yield value
+    elif isinstance(value, str):
+        for part in value.split("/"):
+            with contextlib.suppress(ValueError):
+                yield date.fromisoformat(part.strip())
+    elif isinstance(value, dict):
+        for v in value.values():
+            yield from _dates_in(v)
+    elif isinstance(value, list | tuple):
+        for v in value:
+            yield from _dates_in(v)
+
+
 @pytest.mark.parametrize(
     ("question", "source"),
     list(_framing_queries()),
@@ -76,12 +97,21 @@ def test_framing_queries_never_ask_for_material_from_the_decision_onwards(
 
     A framing fetch that asked for the decision date would pull the result into
     the cache even if the chunk filter later hid it — and the fetch cache is
-    where a mistake persists."""
+    where a mistake persists.
+
+    Every date anywhere in the query is checked, rather than one key per source
+    shape. The earlier version knew about `published_to` and loc.gov's
+    `dates=FROM/TO` and broke the moment Hansard arrived with a third spelling —
+    which is the point: a rule that has to be taught each new source is a rule
+    that a new source can be added without.
+    """
     query = queries.formulate_query(question, source, "framing")
-    ceiling = query.get("published_to")
-    if ceiling is None:  # loc.gov takes a `dates=FROM/TO` range instead
-        ceiling = date.fromisoformat(query["dates"].split("/")[1])
-    assert ceiling < date.fromisoformat(question["decision_date"])
+    decision = date.fromisoformat(question["decision_date"])
+
+    dates = list(_dates_in(query))
+    assert dates, f"{source.key} query carries no date bound at all: {query}"
+    for found in dates:
+        assert found < decision, f"{source.key} asks for {found}, on or past {decision}"
 
 
 def test_query_dates_are_clamped_to_what_the_source_holds():
