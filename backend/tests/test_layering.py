@@ -88,6 +88,7 @@ def test_importing_db_registers_every_table():
         "source_documents",
         "source_chunks",
         "chunk_embeddings",
+        "candidates",
     }
 
 

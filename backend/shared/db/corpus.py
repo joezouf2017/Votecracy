@@ -9,6 +9,7 @@ from sqlalchemy import (
     Column,
     Date,
     DateTime,
+    Float,
     ForeignKey,
     ForeignKeyConstraint,
     Index,
@@ -175,3 +176,61 @@ chunk_embeddings = Table(
 # exact scan is both faster and exactly correct, and IVFFlat built on an empty
 # table is actively harmful — it needs rows to pick its centroids. Add one in
 # a migration of its own once there's enough data to measure recall against.
+
+
+# --- Step 4: candidates, and the one column a re-run must never touch --------
+#
+# `voteview.candidates()` recomputes 10,593 ranked candidates from the bulk
+# corpus in 0.6 seconds, so the candidates themselves are not worth storing for
+# their own sake. What has no other home is **the record that a human looked at
+# one**. That is the whole reason this table exists.
+#
+# Which makes `status` the only interesting thing here: re-reading the corpus
+# refreshes every derived column and must leave the review columns exactly as
+# they were. A re-run that reset a rejection to `pending` would silently undo
+# human work and look like nothing happened. `upsert` enforces that by never
+# naming those columns in an update.
+
+CANDIDATE_STATUSES = ("pending", "approved", "rejected")
+
+candidates = Table(
+    "candidates",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    # The natural key. Measured across the whole corpus: (congress,
+    # bill_number) is unique over all 10,593 candidates, because `candidates()`
+    # already collapses a bill's roll calls to the one worth asking about.
+    Column("congress", Integer, nullable=False),
+    Column("bill_number", String(32), nullable=False),
+    # --- refreshed from the corpus on every run -----------------------------
+    Column("chamber", String(16), nullable=False),
+    Column("vote_date", Date, nullable=False),
+    Column("vote_type", String(64), nullable=False),
+    Column("subject", String(64)),
+    Column("description", Text),
+    # The margin. Recorded because review needs it and generation must not see
+    # it — `voteview.for_prompt_generation` is the whitelist projection that
+    # keeps these two columns away from the model, the same shape as
+    # `content.public_view`.
+    Column("yea", Integer, nullable=False),
+    Column("nay", Integer, nullable=False),
+    # Why this vote was ranked where it was, kept so a reviewer can disagree
+    # with the ranking rather than only with the result.
+    Column("attention_percentile", Float, nullable=False),
+    Column("closeness", Float, nullable=False),
+    Column("coalition_break", Float, nullable=False),
+    # What `select_sources` could not supply for this candidate, if anything.
+    Column("gaps", Text),
+    # --- human review; a corpus re-run must not write these -----------------
+    Column("status", String(16), nullable=False, server_default="pending"),
+    Column("reviewed_at", DateTime(timezone=True)),
+    Column("review_note", Text),
+    # --- provenance ----------------------------------------------------------
+    Column("first_seen_at", DateTime(timezone=True), nullable=False),
+    Column("refreshed_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint("congress", "bill_number", name="uq_candidates_bill"),
+    # Reviewing is SQL, matching how `daily_questions` is handled — no admin UI.
+    # The query is "the highest-ranked thing nobody has looked at yet", so the
+    # index is on that pair.
+    Index("ix_candidates_status_rank", "status", "attention_percentile"),
+)
