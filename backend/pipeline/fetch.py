@@ -37,6 +37,7 @@ currently re-downloads every one.
 """
 
 import hashlib
+import http.client
 import logging
 import random
 import time
@@ -56,7 +57,15 @@ MAX_ATTEMPTS = 5
 BASE_BACKOFF_SECONDS = 2.0
 # Status codes worth retrying: a rate limit or a transient server fault, never
 # a 404 or a 401, which will say the same thing however long you wait.
-RETRYABLE = frozenset({429, 500, 502, 503, 504})
+#
+# 520-527 are Cloudflare's own range, and they are in here because loc.gov threw
+# a 520 on the first real run of this module. loc.gov sits behind Cloudflare —
+# the same reason the spike met a challenge page instead of an HTTP error — and
+# a 520 is "the origin did something the proxy could not parse", which is a
+# transient fault rather than a refusal. Retryable, and deliberately *not* in
+# BLOCKING: treating it as a block would open the breaker on a bad minute and
+# lock the source out for an hour.
+RETRYABLE = frozenset({429, 500, 502, 503, 504, 520, 521, 522, 523, 524, 525, 527})
 # Codes that mean "you are being kept out", as opposed to "that broke". These
 # trip the breaker; a 500 does not, because a server fault is not a block and
 # refusing to talk to the host would only prolong the outage.
@@ -213,6 +222,21 @@ def request(
             # A refused connection or a DNS failure is not the host blocking us.
             if attempt == MAX_ATTEMPTS - 1:
                 raise FetchError(f"{url} unreachable: {exc.reason}") from exc
+            clock.sleep(BASE_BACKOFF_SECONDS * 2**attempt + random.uniform(0, 1))
+            continue
+        except (http.client.HTTPException, TimeoutError, ConnectionError) as exc:
+            # The transport failed rather than the request. loc.gov produced an
+            # `IncompleteRead(6542 bytes read, 6691 more expected)` on this
+            # module's first real run — the connection dropped part-way through
+            # the body, which happens *inside* `response.read()` and so is
+            # neither an HTTPError nor a URLError. Nothing above catches it, and
+            # before this layer existed it simply killed the run.
+            #
+            # Also not a block: the host was willing to talk. Retry, do not trip
+            # the breaker.
+            if attempt == MAX_ATTEMPTS - 1:
+                raise FetchError(f"{url} transport failed: {exc!r}") from exc
+            log.warning("%s: %s; retrying", host, type(exc).__name__)
             clock.sleep(BASE_BACKOFF_SECONDS * 2**attempt + random.uniform(0, 1))
             continue
 

@@ -124,6 +124,19 @@ def test_query_dates_are_clamped_to_what_the_source_holds():
     assert query["dates"] == "1960-06-10/1963-12-31"
 
 
+def test_the_loc_query_is_one_term_at_a_time_not_an_ored_string():
+    """loc.gov accepts boolean operators and does not honour them: measured on
+    the live collection, "Medicare" OR "Kerr-Mills" returns 85 against 957 and
+    329 alone, and OR lands one result away from AND. An ORed query narrows
+    silently, and with seven terms returns nothing at all — which is
+    indistinguishable from the source having no coverage."""
+    question = content.get_question("us-medicare-1965")
+    loc = next(s for s in sources.WHITELIST if s.key == "loc:chronicling-america")
+    query = queries.formulate_query(question, loc, "framing")
+    assert query["terms"] == question["retrieval"]["search_terms"]
+    assert "q" not in query
+
+
 def test_govinfo_query_carries_the_collection_not_the_site():
     question = content.get_question("us-medicare-1965")
     crecb = next(s for s in sources.WHITELIST if s.key == "govinfo:crecb")

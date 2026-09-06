@@ -215,3 +215,33 @@ def test_cache_can_be_declined(calls):
     fetch.request("https://x/y", cache=False)
     fetch.request("https://x/y", cache=False)
     assert len(seen) == 2
+
+
+def test_a_cloudflare_520_is_retried_and_does_not_trip_the_breaker(calls):
+    """loc.gov threw one on this module's first real run.
+
+    520-527 mean the proxy could not parse what the origin said, which is a
+    transient fault. Treating it as a block would open the breaker on a bad
+    minute and lock the source out for an hour.
+    """
+    seen = calls(_http_error(520), _http_error(522), _Response(b"through"))
+    assert fetch.request("https://www.loc.gov/x", cache=False) == b"through"
+    assert len(seen) == 3
+    assert fetch._breakers["www.loc.gov"].opened_at is None
+
+
+def test_a_dropped_connection_is_retried(calls):
+    """loc.gov produced `IncompleteRead(6542 bytes read, 6691 more expected)` on
+    this module's first real run. It happens inside `response.read()`, so it is
+    neither an HTTPError nor a URLError and nothing else here catches it. The
+    host was willing to talk, so it must not trip the breaker either."""
+    import http.client
+
+    seen = calls(
+        http.client.IncompleteRead(b"partial", 6691),
+        ConnectionResetError("reset by peer"),
+        _Response(b"complete"),
+    )
+    assert fetch.request("https://www.loc.gov/x", cache=False) == b"complete"
+    assert len(seen) == 3
+    assert fetch._breakers.get("www.loc.gov", fetch._Breaker()).opened_at is None

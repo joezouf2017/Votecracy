@@ -95,7 +95,29 @@ def formulate_query(question: dict, source: Source, need: str) -> dict:
         # The fetch layer must still check `published_date` on every returned
         # record. A parameter the API accepts is not a parameter the API honours,
         # and only the response can settle it.
-        return {"q": terms, "dates": f"{start}/{end}", "fo": "json"}
+        # **One query per term, not one ORed query.** loc.gov accepts boolean
+        # operators and does not honour them. Measured against the live
+        # collection on the Medicare terms, 1955-1963:
+        #
+        #   "Medicare"                    957
+        #   "Kerr-Mills"                  329
+        #   "Medicare" OR "Kerr-Mills"     85   <- fewer than either alone
+        #   "Medicare" AND "Kerr-Mills"    86   <- and OR ~= AND
+        #   all seven terms ORed            0
+        #
+        # OR and AND landing one apart means neither is being applied; the
+        # operators go into the bag of words and the result narrows. So an
+        # ORed query silently returns a fraction of what was asked for, and
+        # with enough terms, nothing — which reads exactly like "the source has
+        # no coverage".
+        #
+        # A union needs one request per term, merged by the caller. Same shape
+        # as the Hansard query: a thing to walk rather than a thing to send.
+        return {
+            "terms": retrieval["search_terms"],
+            "dates": f"{start}/{end}",
+            "fo": "json",
+        }
 
     if source.key == "hansard":
         # Hansard is browsed, not searched: there is no query endpoint taking
