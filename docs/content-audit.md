@@ -100,9 +100,25 @@ about is the House vote of 2010-03-21; the Senate's 60–39 is run-up, not
 outcome, and presenting it as outcome is what creates the leak. `219–212` is
 absent from the pre-vote corpus and stays absent — that number is safe.
 
-**Recommended: cut the Senate figure from `reveal.actual_vote`.** Left for a
-decision because it changes what a player sees, which is the one thing this
-pipeline should not change on its own.
+**Done 2026-09-05: the Senate figure was cut.** `reveal.actual_vote` is now
+"Passed the House 219–212 — entirely along party lines". Both numbers it
+asserts are absent from the pre-vote corpus and confirmed present in the
+post-vote one (`219, noes 212`), which is what a reveal figure should be able
+to say.
+
+A note on what did *not* survive the edit, because it is the same discipline
+one level down. A first version added "with 34 Democrats voting against and no
+Republicans in favour". The corpus does contain 34 — as
+`"34, to be exact—34 brave Democrats"`, a member's characterisation in a
+speech, and "No Republican will vote for this bill because they say…", also a
+speech. CLAUDE.md's rule for the Congressional Record is that anything numeric
+drawn from it must be attributed to a speaker, so neither claim could stand
+unattributed in a reveal. They were removed rather than dressed up.
+
+That is the general shape of the problem CLAUDE.md flags under "some existing
+reveal prose cannot be grounded at all": the Record is evidence of what was
+*said*, and a reveal states what *happened*. A roll call is one of the few
+things it can supply as fact.
 
 This is deliberate — the prompt says "It's 2010", and a 2009 boundary would
 leave the question with no framing corpus at all. But it means this question
