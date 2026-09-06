@@ -9,8 +9,11 @@ Two volumes per question, because the pre/post-vote boundary falls between them:
 - the volume **ending just before** the decision carries the debate: `framing`
 - the volume **containing** the decision carries the roll call: `vote_record`
 
-Index volumes are excluded — they are page indexes, not debate text, and the
-naive "closest volume" query picks them up.
+Index **and appendix** volumes are excluded — a page index is not debate text,
+and an appendix is extensions of remarks rather than floor proceedings. The
+naive "closest volume" query picks up both; the first version of this list
+missed the appendix case and put `1919_58_appendix` in Prohibition's framing
+slot, where `december-02-1918-january-04-1919_57` belongs.
 
 Save into `backend/.cache/`, which is gitignored. Keep the archive.org
 identifier in the filename: it is the provenance, and `source_documents`

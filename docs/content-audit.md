@@ -157,3 +157,78 @@ Two things the matrix makes visible that weren't obvious in advance:
 countable. A silent fallback would have produced a plausible answer for every
 question and left the gaps invisible until a reveal turned out to cite
 nothing.
+
+## A document's `published_date`, when the source is a bound volume
+
+*Measured 2026-09-05 against all ten Congressional Record volumes now in
+`backend/.cache/`, covering five questions.*
+
+`decision_date` is a property of the question and is settled above. This is the
+other half: where a *document's* date comes from when the thing downloaded is a
+two-to-three-week bound volume rather than a dated page.
+
+### Four of five decision volumes straddle their decision date
+
+| question | volume | span | straddles? |
+|---|---|---|---|
+| medicare | Apr 7 – Apr 27 1965 | decision Apr 8 | yes, by 1 day |
+| prohibition | Jan 6 – Jan 26 1919 | decision Jan 16 | yes, by 10 days |
+| highway | Apr 27 – May 21 1956 | decision Apr 27 | **no** — opens on the decision |
+| clean air | Jun 4 – Jun 12 1970 | decision Jun 10 | yes, by 6 days |
+| income tax | Jan 26 – Feb 12 1913 | decision Feb 3 | yes, by 8 days |
+
+The five *framing* volumes — the ones that carry the pre-vote debate — all end
+strictly before their decision date. **Nothing that rule #1 protects straddles.**
+
+### The rule: `published_date` is the volume's last date, never its first
+
+Taking the first date is the failure this whole document exists to prevent. The
+Clean Air decision volume opens 4 June against a 10 June decision, so a
+`published_date` of 4 June puts the roll call itself on the pre-vote side of
+`published_date < decision_date`. The margin becomes framing material.
+
+The last date fails the other way. The volume is marked 12 June, lands in
+post-vote scope, and the six days of pre-decision debate inside it are lost
+rather than leaked. That is the direction to fail in, and it costs 1, 10, 6 and
+8 days on the four straddling volumes — days that are, unhelpfully, the ones
+closest to the vote and so the most relevant framing material there is.
+
+It also matches what is already in the database: the Medicare slice carries
+`published_date` 1965-04-06, its volume's last day.
+
+**So all ten volumes can be ingested safely today**, and the entire pre-vote
+corpus for five questions is available without any per-page dating at all.
+
+### Per-page dating would recover those days, and works on half the corpus
+
+Each page carries a running header that is a bare date on its own line. Counting
+those, per volume:
+
+| volume era | headers found | share of file between first and last |
+|---|---|---|
+| 1965, 1970 | 1,363 – 1,451 | 100% |
+| 1956 | 2 – 6 | 35 – 79% |
+| 1913, 1919 | 1 – 7 | 0 – 27% |
+
+So the technique is sound and the OCR is not, and it degrades with age. On the
+1970 decision volume it separates 795 pre-decision pages from 568 post-decision
+ones, which is exactly the six days the end-date rule throws away.
+
+Two things measured on the way that are worth not rediscovering:
+
+- **Do not match dates anywhere but a line of their own.** A regex for
+  "weekday, month day, year" across the whole text returns years from 1799 to
+  1985 — those are dates *quoted inside speeches*, and a span built from them is
+  meaningless. The first version of this analysis reported that every volume
+  straddled, including one known to be clean.
+- **Do not require the header to be upper case.** The day-opening masthead reads
+  `TuurSDAY, APRIL 8, 1965` in the 1965 OCR. Case-sensitive matching found zero
+  headers in three of five volumes.
+
+### One volume in the download list was wrong
+
+The list generator excluded titles containing "index" but not "appendix", so
+Prohibition's framing slot resolved to `1919_58_appendix` — extensions of
+remarks, not floor debate. The correct framing volume is
+`december-02-1918-january-04-1919_57`. Fixed in the list; the appendix is
+harmless to keep but carries no debate.
