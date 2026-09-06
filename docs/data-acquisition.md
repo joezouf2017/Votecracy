@@ -10,20 +10,31 @@ unchecked). Do not treat a lead as a plan.
 
 ## Status per question
 
-| question | pre-vote chunks | what is missing | source it needs |
-|---|---|---|---|
-| medicare 1965 | 3,560 | — | done |
-| income tax 1913 | 1,640 | — | done |
-| prohibition 1919 | 790 | — | done |
-| interstate highway 1956 | 746 | — | done |
-| **clean air 1970** | 213 | the rest of its debate | archive.org, one round |
-| **ACA 2010** | 0 | everything | GovInfo `CREC` |
-| **net neutrality 2015** | 0 | everything | FCC, or the Federal Register |
-| **NHS 1946** | 0 | everything | Hansard |
+*Updated 2026-09-05. All eight are now served; what is left is depth, not
+coverage.*
 
-Four questions are finished. **One more archive.org round closes clean air, and
-then that source is done** — the remaining three cannot be served by it at all,
-so they wait for the fetch layer rather than for more manual downloading.
+| question | pre-vote | post-vote | sources |
+|---|---|---|---|
+| ACA 2010 | 9,573 | 7,801 | GovInfo `CREC` |
+| medicare 1965 | 3,743 | 2,379 | archive.org, loc.gov |
+| clean air 1970 | 3,180 | 1,596 | archive.org |
+| income tax 1913 | 1,699 | 78 | archive.org, loc.gov |
+| NHS 1946 | 1,229 | 923 | Hansard |
+| prohibition 1919 | 847 | 120 | archive.org, loc.gov |
+| interstate highway 1956 | 782 | 192 | archive.org, loc.gov |
+| net neutrality 2015 | 347 | 1,811 | GovInfo `FR` |
+
+**Every question has both sides, and every pre-vote chunk verifies clean** —
+`role='framing'`, `published_date` strictly before its decision, zero
+violations. 2,777 documents and 36,300 chunks across five sources.
+
+What remains is not coverage but two specific thinnesses:
+
+- **income tax and prohibition have shallow post-vote corpora** (78 and 120
+  chunks). Both reached their outcome material by accident, via newspaper
+  searches with wide date ranges, rather than by anyone choosing volumes.
+- **no source measures anything yet.** Every one of the five records what
+  someone *said*. See §6 and "What to do next".
 
 ---
 
@@ -143,17 +154,59 @@ requires numeric claims from the Record to be attributed to whoever said them.
 confirmed against a division. Hansard has the sittings; confirm it there before
 fetching sources for that question.
 
-## 6. FRED and PubMed — the `outcome` role only
+## 6. Statistical series — the only sources that measure rather than report
 
-**Lead, not verified.** Neither is in the whitelist yet.
+Everything above records what someone *said*. These record what was *measured*,
+which is the difference between an outcome claim being attributable and being
+assertable — see [`evaluation.md`](evaluation.md), "What the generator may
+assert", for why that distinction now has teeth.
 
-They matter more than their position on this list suggests. Right now `outcome`
-retrieval resolves to the Congressional Record, which is **a record of what was
-said about effects, not evidence of them** — so everything numeric taken from it
-has to be attributed to a speaker. FRED and PubMed are what would make an
-outcome claim about the world rather than about a speech.
+### World Bank — **verified, no key, and the next thing to wire**
 
-FRED needs a free key. PubMed's E-utilities need none below 3 requests/second.
+```
+https://api.worldbank.org/v2/country/GBR/indicator/SP.DYN.LE00.IN?format=json&date=1960:2023
+```
+
+Measured live 2026-09-05: **64 dated observations each** for UK life expectancy
+(`SP.DYN.LE00.IN`), infant mortality (`SP.DYN.IMRT.IN`) and health spending as a
+share of GDP (`SH.XPD.CHEX.GD.ZS`). No key, no rate limit encountered, JSON, one
+call per (country, indicator).
+
+It fits the existing model better than any source so far, because **an
+observation is already a dated fact**: the year is `published_date`, the value
+is the number, `role` derives from the date as usual, and the claim kind is
+`measured` because nobody is speaking. The adapter should end up shorter than
+`hansard.py` — there is no HTML to strip, no OCR, no span to parse out of a
+title.
+
+It directly answers the NHS reveal, which currently claims "infant mortality
+fell sharply and life expectancy improved" with nothing behind it.
+
+**What it does not cover:** anything US-agency-specific. It is
+international-comparable macro indicators, so Medicare enrolment, EPA pollution
+figures and the Interstate's total cost are all outside it.
+
+### FRED — **needs a free key, which nobody has requested yet**
+
+Register at `fred.stlouisfed.org` (free, instant). It carries the US series the
+World Bank does not: the top marginal income tax rate, the uninsured rate,
+health spending detail. That covers the income-tax question's `94%`, which is
+currently unsupported.
+
+Not verified, because there is no keyless path to check it with.
+
+### PubMed — later, and for a different job
+
+E-utilities need no key below 3 requests/second. It supplies medical literature
+rather than series, so it is for claims about health *findings* rather than
+health *statistics*. Nothing currently needs it.
+
+### Still out of reach for anyone
+
+CMS (Medicare enrolment), EPA (pollution trends) and FHWA (highway cost) each
+publish open data and each would be its own adapter. Until then those three
+figures can only be **attributed** — CREC discusses all of them and runs to the
+present. That is a documented downgrade, not a gap.
 
 ## 7. FCC — net neutrality, and the one real lead here
 
@@ -195,6 +248,26 @@ So, before fetching anything for a new question:
 3. **Probe vocabulary on one volume before committing to a term set.** Terms are
    era-specific and the formal name is usually the dead one.
 4. **Then** download the whole set, ingest once, embed once.
+
+## What to do next, in order
+
+The evidence policy in [`evaluation.md`](evaluation.md) depends on the corpus
+reaching the present. It mostly does; these three close the rest. None is
+blocked on anything.
+
+**1. Top up recent CREC and Hansard per question. No new code.** Both adapters
+exist and both reach far enough — CREC to today, Hansard to 2005. This is what
+turns "what it became" from an unsupported assertion into an attributable one,
+and it is the cheapest of the three by a wide margin. Follow the rule above:
+settle the set before fetching, ingest once, embed once.
+
+**2. Wire the World Bank.** No key, verified reachable, and the shortest adapter
+in the pipeline because observations arrive already dated and already numeric.
+Unblocks the NHS outcome claims specifically.
+
+**3. Get a FRED key** — `fred.stlouisfed.org`, free and instant. This is the one
+step that needs a human, which is why it is worth starting before it is needed.
+It covers the US series the World Bank does not.
 
 ## Cost, so the sequencing is arguable rather than assumed
 
