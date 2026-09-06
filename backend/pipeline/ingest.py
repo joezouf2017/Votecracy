@@ -36,6 +36,33 @@ from shared.settings import get_settings
 
 log = logging.getLogger(__name__)
 
+# Whether this process has already said the docs are stale. Said once per run
+# rather than per document, because an ingest writes hundreds.
+_warned = False
+
+
+def _corpus_changed() -> None:
+    """Say that the generated figures in `docs/` are now out of date.
+
+    This is the trigger that was missing. Those figures are measurements of the
+    corpus, and the only thing that knows a measurement has expired is whatever
+    just invalidated it — not the person who happens to edit that file next,
+    which is what the project relied on and what let a status table go stale
+    twenty-three minutes after it was written.
+
+    A log line rather than a raise: an ingest that succeeded has not failed
+    because a document is behind.
+    """
+    global _warned
+    if _warned:
+        return
+    _warned = True
+    log.warning(
+        "the corpus changed — docs/ now has stale generated figures. "
+        "Run: python docs/refresh.py"
+    )
+
+
 # Line-break hyphenation, rejoined only before a lower-case letter. That
 # restriction is what protects real compounds: "King-Anderson" has a capital
 # after the hyphen and is left alone. Measured on one 1965 volume, this
@@ -316,6 +343,7 @@ def store_passage(
         len(passage.text),
         len(rows),
     )
+    _corpus_changed()
     return document_id
 
 
@@ -367,6 +395,8 @@ def embed_pending(*, batch: int = 200) -> tuple[int, int]:
             conn.execute(corpus.chunk_embeddings.insert(), rows)
         done += len(rows)
         log.info("%s: stored %d/%d", model, done, len(todo))
+    if done:
+        _corpus_changed()
     return done, total - len(todo)
 
 

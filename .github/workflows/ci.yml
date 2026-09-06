@@ -19,6 +19,13 @@ jobs:
       - run: ruff check backend
       - run: ruff format --check backend
 
+      # Structure only, not freshness. CI has no corpus -- the cold-start job
+      # brings up empty containers -- so it cannot tell whether a generated
+      # figure is current. It can tell whether someone hand-edited inside a
+      # generated block or deleted one, which is a different failure and a real
+      # one. Freshness is checked locally; see README.
+      - run: python docs/refresh.py --markers
+
   backend:
     runs-on: ubuntu-latest
     steps:

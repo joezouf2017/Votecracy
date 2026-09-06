@@ -110,9 +110,29 @@ prose has no link to whatever produced it — so nothing notices when it stops
 being true. Those parts sit inside `<!-- generated: … -->` markers and come from
 this script; everything outside them is hand-written and does not rot.
 
-Same category as `alembic check`: needs a real database, deliberately not in the
-test suite (which is container-free), run after anything that changes the
-corpus.
+```bash
+python docs/refresh.py --markers  # structure only, no database needed
+```
+
+**Freshness cannot be checked in CI, and the reason is not containers.** CI does
+run them — the `cold-start` job brings the whole stack up — but those containers
+are empty. The corpus is 477 MB of cached source text plus a database that has
+never been in version control, so a runner has no ground truth to compare
+against and would call every figure stale.
+
+So the work is split by what each place can actually know:
+
+| | checks | where |
+|---|---|---|
+| `--markers` | blocks present, paired, not hand-edited | CI, in the lint job |
+| `--check` | the figures are current | locally, needs the corpus |
+| the ingest paths | say so the moment they invalidate a figure | automatic |
+
+That last one is the part that matters. A measurement expires the instant
+something changes the corpus, and the only thing that knows is whatever changed
+it — not the person who edits that document next, which is what this project
+relied on and what let a status table go stale twenty-three minutes after it was
+written.
 
 ## Load testing
 

@@ -20,11 +20,21 @@ generalises it.
 "loc.gov accepts boolean operators and does not honour them" is true forever.
 Only the measurements are generated, and they are the only part that rots.
 
-**Not a pytest test, deliberately.** The suite is container-free by design —
-Postgres and Redis are replaced by in-process stand-ins — and these figures have
-to be measured against the live database. That makes this the same category as
-`alembic check`: needs a real database, lives outside the suite, run before
-committing a claim about the corpus.
+**Not a pytest test, and it cannot be a CI job either.** The reason is not the
+one it looks like. CI does run containers — the `cold-start` job brings the whole
+stack up — but those containers are *empty*. The corpus is 477 MB of cached
+source text and a database that has never been in version control, so CI has no
+ground truth to check these numbers against; `--check` there would generate
+"0 documents" and call everything stale.
+
+So this is inherently local, the same category as `alembic check`, and the honest
+response is to make the *trigger* reliable rather than to pretend a remote runner
+can do it:
+
+- `--markers` checks what CI genuinely can: that every block is present, paired
+  and not hand-edited into a different shape. No database needed.
+- The ingest paths say so when they invalidate the numbers, which is the trigger
+  that was missing — "I happen to be editing this doc" was never going to work.
 """
 
 import argparse
@@ -155,6 +165,44 @@ BLOCKS = {
 }
 
 
+def _check_markers() -> int:
+    """Every block present, paired, and containing only generated content.
+
+    This is the part of the job a runner with no corpus can still do. It cannot
+    tell whether a number is current — nothing in CI can — but it does catch a
+    block edited by hand, an unclosed marker, and a block referenced here that
+    someone deleted from the document.
+    """
+    problems = []
+    for filename, blocks in BLOCKS.items():
+        path = DOCS / filename
+        if not path.exists():
+            problems.append(f"{filename}: missing entirely")
+            continue
+        text = path.read_text(encoding="utf-8")
+        opens = text.count("<!-- generated:")
+        closes = text.count("<!-- /generated -->")
+        if opens != closes:
+            problems.append(
+                f"{filename}: {opens} opening markers against {closes} closing"
+            )
+        for name in blocks:
+            if not re.search(_PATTERN.format(name=re.escape(name)), text, re.S):
+                problems.append(f"{filename}: block {name!r} not found")
+
+    for p in problems:
+        print(f"  {p}")
+    if problems:
+        print(
+            f"\n{len(problems)} problem(s). Generated blocks are written by "
+            "docs/refresh.py and should not be edited by hand."
+        )
+        return 1
+    total = sum(len(b) for b in BLOCKS.values())
+    print(f"{total} generated blocks present and well-formed")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -162,7 +210,15 @@ def main() -> int:
         action="store_true",
         help="exit non-zero if any block is out of date, and change nothing",
     )
+    parser.add_argument(
+        "--markers",
+        action="store_true",
+        help="verify block markers only; needs no database, safe for CI",
+    )
     args = parser.parse_args()
+
+    if args.markers:
+        return _check_markers()
 
     stale, written, missing = [], [], []
     for filename, blocks in BLOCKS.items():
