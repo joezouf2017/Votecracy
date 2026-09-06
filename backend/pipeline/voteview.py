@@ -23,12 +23,12 @@ import csv
 import logging
 import math
 import re
-import urllib.request
 from bisect import bisect_right
 from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path
 
+from pipeline import fetch as http
 from pipeline import queries
 
 log = logging.getLogger(__name__)
@@ -371,9 +371,11 @@ def download_corpus(path: Path) -> Path:
         return path
     path.parent.mkdir(parents=True, exist_ok=True)
     log.info("downloading voteview corpus from %s", CORPUS_URL)
-    request = urllib.request.Request(CORPUS_URL, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(request) as response, open(path, "wb") as f:  # noqa: S310
-        f.write(response.read())
+    # Through the shared client for retry and the breaker, but `cache=False`:
+    # this writes its own 29 MB file and the guard above is its cache, so
+    # letting the HTTP layer keep a second copy would double the disk cost for
+    # no benefit.
+    path.write_bytes(http.request(CORPUS_URL, expect=("text/csv",), cache=False))
     log.info("voteview corpus cached at %s (%d bytes)", path, path.stat().st_size)
     return path
 

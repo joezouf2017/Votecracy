@@ -25,11 +25,10 @@ published" — the same lesson loc.gov taught with its ignored date parameters.
 import json
 import logging
 import re
-import urllib.error
-import urllib.request
 from dataclasses import dataclass
 from datetime import date
 
+from pipeline import fetch as http
 from pipeline import ingest
 from shared.db import corpus
 from shared.db import engine as db_engine
@@ -90,18 +89,19 @@ def _key() -> str:
     return key
 
 
-def _request(url: str, data: bytes | None = None) -> bytes:
-    headers = {"User-Agent": get_settings().user_agent}
-    if data:
-        headers["Content-Type"] = "application/json"
+def _request(
+    url: str, data: bytes | None = None, expect: tuple[str, ...] | None = None
+) -> bytes:
+    """Through the shared client. Search results are not cached — the whole
+    point of a query is that its answer may change — but granule bodies are,
+    because a published document does not."""
+    headers = {"Content-Type": "application/json"} if data else {}
     try:
-        with urllib.request.urlopen(  # noqa: S310
-            urllib.request.Request(url, data=data, headers=headers), timeout=90
-        ) as response:
-            return response.read()
-    except urllib.error.HTTPError as exc:
-        detail = exc.read()[:200].decode("utf-8", "replace")
-        raise GovInfoError(f"govinfo returned HTTP {exc.code}: {detail}") from exc
+        return http.request(
+            url, data=data, headers=headers, expect=expect, cache=data is None
+        )
+    except http.FetchError as exc:
+        raise GovInfoError(str(exc)) from exc
 
 
 def search(query: str, *, limit: int = 100) -> list[Granule]:
@@ -133,7 +133,8 @@ def fetch(granule: Granule) -> str:
     """
     raw = _request(
         f"{API}/packages/{granule.package_id}/granules/"
-        f"{granule.granule_id}/htm?api_key={_key()}"
+        f"{granule.granule_id}/htm?api_key={_key()}",
+        expect=("text/html", "text/plain"),
     ).decode("utf-8", "replace")
     return _SPACES.sub(" ", _TAGS.sub(" ", _SCRIPTS.sub(" ", raw)))
 

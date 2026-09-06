@@ -36,11 +36,8 @@ part of `chunk_embeddings`' primary key — two models' vectors coexist and
 import json
 import logging
 import math
-import random
-import time
-import urllib.error
-import urllib.request
 
+from pipeline import fetch as http
 from shared.db.engine import EMBEDDING_DIM
 from shared.settings import get_settings
 
@@ -68,12 +65,6 @@ ENDPOINT = "https://openrouter.ai/api/v1/embeddings"
 # one is bounded.
 BATCH_SIZE = 200
 
-# A 429 is a rate limit, not a failure: the same request succeeds shortly. What
-# must not happen is retrying immediately — loc.gov resets its block countdown
-# on any request made during a block, and an eager retry loop turns a
-# one-minute wait into an indefinite one. Assume every API works that way.
-MAX_ATTEMPTS = 6
-BASE_BACKOFF_SECONDS = 2.0
 
 # Refuse providers that train on what is sent to them. A request that cannot be
 # routed to one fails rather than quietly going somewhere it should not — which
@@ -116,43 +107,30 @@ class EmbeddingError(RuntimeError):
 
 
 def _post(body: dict) -> dict:
-    settings = get_settings()
-    key = settings.openrouter_api_key.get_secret_value()
+    """Through the shared client, which owns the retry and the breaker now.
+
+    Not cached, and that is deliberate. Every other caller fetches a published
+    document whose bytes do not change; this sends text and gets back a vector,
+    and caching it would mean a corpus rebuild silently reused vectors from
+    whatever model was configured last time.
+    """
+    key = get_settings().openrouter_api_key.get_secret_value()
     if not key:
         raise EmbeddingError("OPENROUTER_API_KEY is not set; see .env.example")
-    request = urllib.request.Request(
-        ENDPOINT,
-        data=json.dumps(body).encode(),
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {key}",
-            "User-Agent": settings.user_agent,
-        },
-    )
-    model = body.get("model")
-    for attempt in range(MAX_ATTEMPTS):
-        try:
-            with urllib.request.urlopen(request) as response:
-                return json.load(response)
-        except urllib.error.HTTPError as exc:
-            detail = exc.read().decode()[:300]
-            if exc.code not in (429, 500, 502, 503) or attempt == MAX_ATTEMPTS - 1:
-                raise EmbeddingError(
-                    f"{model} returned HTTP {exc.code}: {detail}"
-                ) from exc
-            # Exponential, with jitter so parallel workers do not all return at
-            # the same instant and re-trigger the limit together.
-            delay = BASE_BACKOFF_SECONDS * 2**attempt + random.uniform(0, 1)
-            log.warning(
-                "%s returned %d; backing off %.1fs (attempt %d/%d)",
-                model,
-                exc.code,
-                delay,
-                attempt + 1,
-                MAX_ATTEMPTS,
-            )
-            time.sleep(delay)
-    raise EmbeddingError("unreachable")
+    try:
+        raw = http.request(
+            ENDPOINT,
+            data=json.dumps(body).encode(),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {key}",
+            },
+            expect=("application/json",),
+            cache=False,
+        )
+    except http.FetchError as exc:
+        raise EmbeddingError(str(exc)) from exc
+    return json.loads(raw)
 
 
 def _unit(vector: list[float]) -> list[float]:

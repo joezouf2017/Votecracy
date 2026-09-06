@@ -36,14 +36,13 @@ is on topic, and a Hansard section is 100% on topic by construction.
 
 import logging
 import re
-import urllib.request
 from dataclasses import dataclass
 from datetime import date
 
+from pipeline import fetch as http
 from pipeline import ingest
 from shared.db import corpus
 from shared.db import engine as db_engine
-from shared.settings import get_settings
 
 log = logging.getLogger(__name__)
 
@@ -112,11 +111,12 @@ def to_text(html: str) -> str:
 
 
 def fetch(sitting: Sitting) -> str:
-    request = urllib.request.Request(
-        sitting.url, headers={"User-Agent": get_settings().user_agent}
-    )
-    with urllib.request.urlopen(request, timeout=60) as response:  # noqa: S310
-        return response.read().decode("utf-8", "replace")
+    """Through the shared client, so this gets backoff and a circuit breaker.
+
+    `expect` is text/html because that is what Hansard serves — and a 200
+    carrying anything else means something answered that is not Hansard.
+    """
+    return http.request(sitting.url, expect=("text/html",)).decode("utf-8", "replace")
 
 
 def already_ingested(sitting: Sitting) -> int:
