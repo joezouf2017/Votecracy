@@ -62,8 +62,24 @@ source_documents = Table(
     Column("sha256", String(64), nullable=False),  # content-addressed cache key
     Column("text", Text, nullable=False),
     Column("fetched_at", DateTime(timezone=True), nullable=False),
+    # `question_id` is part of this on purpose, and leaving it out was a bug.
+    #
+    # A cached volume is not a per-question asset. One Congressional Record
+    # volume is two to three weeks of everything Congress did, and a question
+    # extracts 1-11% of it. The same volume legitimately serves several
+    # questions — the March 1956 volume was fetched for the highway bill and
+    # also contains every other roll call of that fortnight.
+    #
+    # Extraction is per question, so the same volume yields *different*
+    # passages under different search terms. Those are genuinely different
+    # documents. Without `question_id` here they collide on `#p0` and the
+    # second question simply cannot be ingested, which quietly makes every
+    # download single-use.
     UniqueConstraint(
-        "source_key", "external_id", name="uq_source_documents_source_external"
+        "source_key",
+        "external_id",
+        "question_id",
+        name="uq_source_documents_source_external",
     ),
     # Not useful on its own — it exists so source_chunks can point a composite
     # foreign key at these three columns. See the note there.
