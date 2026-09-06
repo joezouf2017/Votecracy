@@ -137,11 +137,23 @@ def test_a_span_at_exactly_the_limit_is_allowed():
     assert verify(Claim("42", 1, (0, len(doc)), value=42), doc)
 
 
-def test_a_claim_with_no_number_is_not_rejected_but_is_not_evidence_either():
-    """A span cannot prove an opinion. "Most economists consider it one of the
-    best investments ever made" has nothing to check — several of the existing
-    eight reveals lean on that shape, and it is the shape a model produces most
-    readily. Catching it is human review's job, not this function's."""
+def test_a_claim_with_no_number_passes_today_and_is_scheduled_not_to():
+    """Pinning current behaviour, **not endorsing it.**
+
+    This used to read "catching it is human review's job, not this function's".
+    That was wrong in a way this fixture demonstrates: "Opinions differed
+    sharply", cited to a span containing "Mr. Speaker", passes. `Claim.text` is
+    read by nothing, so a claim's wording and the text it cites are never
+    compared — and `unsupported_numbers` cannot be the backstop either, since it
+    subtracts claim *values* and this claim has none. A sentence with no number
+    is invisible to both halves of rule #2, and measured on the eight
+    hand-written questions that is 36% of outcome sentences.
+
+    The settled policy is that such sentences do not exist — every sentence
+    covered by a claim, every claim carrying a verbatim quote. See
+    `docs/evaluation.md`, "What the generator may assert". Step 7 implements it;
+    until then this test records the gap rather than blessing it.
+    """
     claim = Claim("Opinions differed sharply.", 1, span_of("Mr. Speaker"), value=None)
     assert verify(claim, DOC)
 

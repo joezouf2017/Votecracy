@@ -22,6 +22,22 @@ economists consider it one of the best infrastructure investments ever made"
 has no value to verify and no span that could support it. Such sentences must
 be attributed to a named speaker or cut — see `unsupported_numbers`, which is
 the half of the job that catches a generator quietly dropping citations.
+
+**That paragraph describes behaviour that is scheduled to be replaced, and it
+is worth knowing why before relying on it.** "Cannot check" is implemented as
+`verify` returning `Verdict(True)` early, which is a pass, not an abstention —
+and `unsupported_numbers` cannot be the backstop it names, because it subtracts
+claim *values* and a claim carrying no value contributes nothing to it. So a
+sentence with no number is invisible to both halves. Measured on the eight
+hand-written questions, that is 36% of outcome sentences, and they are the ones
+with a side: "accelerated suburban sprawl and the decline of inner cities",
+"the opponents who warned rates would rise were correct".
+
+The settled policy is that such sentences do not exist — every sentence is
+covered by a claim, every claim carries a verbatim quote, and no claim kind
+means "trust me". `docs/evaluation.md`, "What the generator may assert", has the
+rules and the measurements. Step 7 implements them; nothing here changes until
+it does.
 """
 
 import re

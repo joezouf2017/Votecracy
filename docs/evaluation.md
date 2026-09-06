@@ -135,13 +135,169 @@ happened to be said or printed, not what is true or relevant. "I have no source
 for that" is a correct answer, and Set 3 exists because it has to be a *measured*
 behaviour rather than an assumed one.
 
-**Some existing reveal prose cannot be grounded at all.** "Most economists
-consider it one of the best infrastructure investments ever made" has no
-`(document_id, char_span)` that could support it — the rule #2 check verifies
-numbers against spans, and a summary judgement is not a number. Several of the
-eight hand-written outcome paragraphs lean on this shape, and it is the shape an
-LLM produces most readily, so generation will multiply it.
+**Some existing reveal prose cannot be grounded at all.** That was recorded here
+as an open limit. It is now a settled policy, and the section below replaces
+this paragraph.
 
-Either attribute such claims to a named source or cut them. The failure to avoid
-is letting the grounding check quietly skip what it cannot verify, which turns a
-green check into a statement about the checker rather than the content.
+
+## What the generator may assert
+
+The rule below was written into four places — `grounding.py`'s module docstring,
+a test docstring, this document, and CLAUDE.md — and enforced in none of them:
+*attribute a claim to a named source or cut it; do not let the grounding check
+quietly skip what it cannot verify.* This section is that rule made specific
+enough to implement, settled before Step 7 rather than discovered inside it.
+
+### What the check does today, measured
+
+Three numbers, taken against the live corpus:
+
+| | |
+|---|---|
+| outcome sentences whose numbers the corpus supports | **12 of 28** |
+| outcome sentences asserting **no number at all** | **10 of 28 (36%)** |
+| production callers of `grounding.verify` or `unsupported_numbers` | **0** |
+
+The 36% is the important one, because those sentences are invisible to both
+halves of rule #2. `unsupported_numbers` subtracts claim *values*, so a claim
+carrying no value contributes nothing to it; and `verify` returns early:
+
+```python
+    if claim.value is None:
+        return Verdict(True)          # grounding.py:147-151
+```
+
+A test pins that as intended behaviour, and its own fixture shows the cost:
+
+```python
+claim = Claim("Opinions differed sharply.", 1, span_of("Mr. Speaker"), value=None)
+```
+
+"Opinions differed sharply", cited to a span containing "Mr. Speaker" — passes.
+`Claim.text` is read by nothing (verified: zero references in `grounding.py` and
+`spoilers.py`), so a claim's wording and the text it cites have never been
+compared. Another test writes `Claim("anything", ...)`, which is the field's
+honest description today.
+
+The sentences in that 36% are not neutral filler either. They are the ones with
+a side:
+
+> "It also **accelerated suburban sprawl and the decline of inner cities**"
+> "The opponents who warned rates would rise **were correct**"
+> "**contradicting industry predictions**, broadband investment did not decline"
+
+So this is a rule #3 problem wearing a rule #2 costume, which is the harder kind
+to see: the sentence looks like every other sourced sentence.
+
+### The deeper gap: the model cannot say who is speaking
+
+`outcome` retrieval resolves to the Congressional Record, because no statistical
+source is in the whitelist. That is a record of what was *said* about effects,
+not evidence of them — `architecture.md` says so, and `sources.py` repeats it in
+a comment.
+
+But a correctly attributed claim is still just a `Claim` with a `value`.
+`verify` checks the figure appears in the span, it does, and it passes. **Nothing
+verifies the attribution, and nothing records that the number is a quoted
+assertion rather than a measured fact.** Every numeric outcome claim in this
+corpus is currently of the first kind, and the model has no way to express it.
+
+### Three rules
+
+**1. The corpus bounds what may be *asserted*, not what period may be
+*discussed*.** The obvious reading — only claim what a document says, therefore
+only write about the years just after the decision — would gut the game, whose
+whole hook is the long arc. It is also wrong, because the corpus reaches the
+present:
+
+| | coverage | status |
+|---|---|---|
+| GovInfo `CREC` | 1994 to today | wired; measured live to 2025-12 |
+| Hansard | 1803 to 2005 | wired |
+| World Bank | 1960 to 2023, no key | not wired; verified reachable |
+| FRED | US series, free key | not wired; needs a key |
+
+Measured against the live APIs while writing this: CREC holds 98 granules
+mentioning "top marginal rate" (latest 2025-02) and 203 mentioning "uninsured
+rate" (latest 2025-12); the World Bank returns 64 dated observations each for UK
+life expectancy, infant mortality and health spending.
+
+So "Medicare covers 67 million people today" is not forbidden — it is *written
+differently*. Either **attributed** ("in 2024 the Senate was told that…", quoting
+CREC, which needs no new code), or **measured**, once a statistical series is
+wired. What changes is not whether it can be said, but whether who said it is
+recorded.
+
+**2. Every sentence must be covered by a claim, and coverage is positional.**
+`unsupported_numbers` is a set difference over the whole text, so a number counts
+as supported if *any* claim anywhere carries it, regardless of which sentence it
+sits in. Coverage becomes sentence-level: a sentence with no claim is not allowed
+to exist. That disposes of the 36% by construction — those sentences stop being
+invisible and start being rejected.
+
+**3. No claim kind means "trust me".** `verify` stops returning early. Every kind
+has its own deterministic check, and no model is involved in any of them.
+
+### The claim contract
+
+**Kind is derived from the source, never declared by the generator.** Asking a
+model whether a passage is measurement or testimony asks for a judgement it makes
+badly and that nothing could check. `(source_key, role)` already answers it, and
+both columns are already on `source_chunks`:
+
+| source | role | kind | why |
+|---|---|---|---|
+| CREC / CRECB / Hansard | `vote_record` | **measured** | the chamber's record of what it did — its procedural voice |
+| CREC / CRECB / Hansard | `framing`, `outcome` | **attributed** | speech. Faithful evidence that someone said it, not that it is so |
+| GovInfo `FR`, `STATUTE` | any | **measured** | the instrument's own text |
+| loc.gov newspapers | any | **attributed** | reportage, attributed to the paper |
+| statistical series | `outcome` | **measured** | a dated observation, nobody's assertion |
+
+Derived rather than declared, which is the same pattern as `Volume.role` and
+`hansard.role_for`: decided by a fact, not by hand.
+
+**Every claim carries a verbatim quote.** The mechanism is already settled in
+[`architecture.md`](architecture.md): the model emits a quote, code locates it and derives the span.
+A quote that cannot be found is itself a detection — the model paraphrased where
+it claimed to quote. On top of that:
+
+- **measured** — the quote must contain the asserted value
+- **attributed** — the quote must contain the value *and* the generated sentence
+  must name the source
+- both — the quote must fit inside `MAX_SPAN_CHARS`
+
+`Claim.text` stops being decorative and becomes the sentence a claim supports,
+which is what makes positional coverage checkable.
+
+### Claims are stored, and the quote is the durable half
+
+Not a display concern. An audit one, and a correctness one.
+
+Eight hand-written questions can be read by a person. Five hundred generated ones
+cannot, and the only way to tell whether one still stands is its claim chain:
+sentence, quote, document. Discarding claims after verification means no question
+can ever be re-checked without regenerating it, which costs real money.
+
+The second reason is sharper. **A corpus rebuild invalidates every `char_span`.**
+This corpus was rebuilt three times in one session — the term matcher, the
+chunker and the search terms each forced one. A question verified against the old
+chunks is silently unsupported against the new ones, and nothing would notice.
+
+So: **store the verbatim quote and treat `char_span` as a derived cache.** Offsets
+move; quotes do not. Re-verification after a rebuild is then mechanical — relocate
+each quote, recompute the span, flag any question whose quote can no longer be
+found. That belongs in CI, and it is the only way to catch "the corpus changed,
+the question is still here, and its support is gone".
+
+`document_id` is not durable either, since re-ingesting a question issues new ids.
+The natural key `(source_key, external_id)` is, and both should be stored.
+
+### A number for citation validity
+
+Set 2's target reads "low", while rule #1's reads "0%, non-negotiable". A claim
+whose quote cannot be located is not a quality problem but a fabrication signal,
+so it gets the same treatment: **quote-location failure is 0%, non-negotiable.**
+
+Whether a claim *follows* from its quote remains a judgement, and stays with the
+human review gate and the neutrality judge. The policy's job is to make every
+claim checkable at a glance, not to prove it automatically.

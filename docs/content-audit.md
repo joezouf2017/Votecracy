@@ -299,3 +299,79 @@ Prohibition's framing slot resolved to `1919_58_appendix` — extensions of
 remarks, not floor debate. The correct framing volume is
 `december-02-1918-january-04-1919_57`. Fixed in the list; the appendix is
 harmless to keep but carries no debate.
+
+
+## The eight outcomes, against the evidence policy
+
+*Measured 2026-09-05, after the outcome windows were widened.* The policy is in
+[`evaluation.md`](evaluation.md); this is what the existing content scores
+against it and what each question needs.
+
+| question | sentences the corpus supports | sentences with no number | figures still unsupported |
+|---|---|---|---|
+| medicare 1965 | 2 / 3 | 0 | 67,000,000 |
+| prohibition 1919 | 1 / 3 | 1 | 1933 |
+| interstate highway 1956 | 1 / 4 | 2 | 500,000,000,000 |
+| clean air 1970 | 3 / 4 | 1 | — |
+| net neutrality 2015 | 1 / 4 | 2 | 2024 |
+| ACA 2010 | 3 / 4 | 1 | — |
+| income tax 1913 | **0 / 3** | 2 | 94 |
+| NHS 1946 | 1 / 3 | 1 | 5,000,000 · 8,000,000 |
+| **total** | **12 / 28** | **10 (36%)** | |
+
+Reproduce it:
+
+```bash
+PYTHONPATH=backend ./.venv/Scripts/python.exe -c "
+import re
+from pipeline import retrieval as r
+from pipeline.grounding import numbers_in
+from shared import content
+for q in content.all_questions():
+    post = numbers_in(r.scope_text(q['id'], r.Scope.POST_VOTE))
+    sents = [s.strip() for s in re.split(r'(?<=[.!?])\s+', q['reveal']['outcome']) if s.strip()]
+    ok = [s for s in sents if numbers_in(s) and numbers_in(s) <= post]
+    nonum = [s for s in sents if not numbers_in(s)]
+    unsup = sorted({n for s in sents for n in numbers_in(s)} - post)
+    print(q['id'], len(ok), '/', len(sents), '| no number:', len(nonum), '| unsupported:', unsup)
+"
+```
+
+### The unsupported figures are three different problems
+
+**Reachable, just not fetched yet.** `1933` (repeal), `94` (the wartime top
+marginal rate), NHS `5,000,000` and `8,000,000` (first-year treatments), `2024`
+(the rules briefly restored). All of these were said somewhere in a record we
+have an adapter for. Fetch before deciding to cut.
+
+**Reachable only as testimony.** `67,000,000` (Medicare today) and
+`500,000,000,000` (the highway's total cost in today's dollars). No
+contemporaneous record can contain them, but CREC runs to the present and
+Congress discusses both — so they become *attributed* claims, named to whoever
+said them, rather than assertions. Measured while writing this: CREC holds 538
+granules mentioning the Interstate Highway System and cost.
+
+**Not reachable at all, and no upgrade path.** The ten sentences carrying no
+number. "It also accelerated suburban sprawl and the decline of inner cities",
+"the debate remains unresolved", "the opponents who warned rates would rise were
+correct". No quote supports a value judgement, and unlike the figures above these
+do not improve with more fetching.
+
+### The rewrite standard
+
+1. Every sentence either carries a claim the corpus supports, or goes.
+2. A figure from the Congressional Record, Hansard or a newspaper **names its
+   speaker or its publication** — "in July 1965 the Senate was told that…", never
+   "the fact is…". That source records what was *said*, and stating it flat
+   launders one side's advocacy into neutral fact.
+3. Present-day statistics are **rewritten, not cut**: attributed first, upgraded
+   to measured if a statistical series is wired later.
+4. Causal and evaluative judgements are cut. There is no version of them that a
+   quote can support.
+5. Fetch for the reachable gaps before deciding anything, since four of the six
+   unsupported figures are only missing because nobody went and got them.
+
+The result should still cover the long arc — that is the point of the game — but
+every sentence points at a source, and a reader can tell which claims were
+measured and which were made by someone with a stake. That second distinction is
+what the current prose loses completely.

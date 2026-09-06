@@ -291,6 +291,21 @@ enough to be evidence rather than a haystack, and actually contains the value �
 citation vouches for. **No model is involved**, deliberately — using an LLM to
 decide whether an LLM hallucinated reintroduces exactly what the rule prevents.
 
+**A sentence with no number in it used to pass, and that was a hole rather than
+a division of labour.** `verify` returned early when a claim carried no value,
+on the reasoning that a span cannot prove an opinion and human review would
+catch it. Measured on the eight hand-written questions, 36% of outcome sentences
+carry no number — and they are the ones with a side: "accelerated suburban
+sprawl and the decline of inner cities", "the opponents who warned rates would
+rise were correct". Those were invisible to both halves of the check.
+
+The settled policy is that such sentences do not exist. Every sentence is
+covered by a claim, every claim carries a verbatim quote, and no kind of claim
+means "trust me". `Claim.text` — read by nothing today — becomes the sentence a
+claim supports, which is what makes coverage checkable per sentence rather than
+as a set difference over the whole paragraph. Full rules, the kind table and the
+measurements are in [`evaluation.md`](evaluation.md).
+
 **The model never produces the span.** It is asked for a verbatim quote; code
 locates that quote in the chunk it was given and derives `(document_id,
 char_span)` from the match. Asking a model for character offsets produces
@@ -338,9 +353,25 @@ each other on purpose: [`evaluation.md`](evaluation.md).
 
 | table | rebuilt from | cost |
 |---|---|---|
-| `source_documents` | the network only | the expensive one — never drop |
+| `source_documents` | the network only | expensive — never drop |
 | `source_chunks` | documents | free, locally |
 | `chunk_embeddings` | chunks | embedding API calls |
+| `claims` | **nothing** | paid generation, and not the same claims twice |
+
+`claims` is the outlier and belongs at the bottom for a reason that breaks the
+pattern: the three above it are *derivations*, and rebuilding one reproduces
+what was there. Claims come from a model, so regenerating them costs money **and
+returns something different** — a rebuild is not a restore. They are also the
+only audit trail a generated question has, which is what makes them worth
+storing rather than discarding after verification.
+
+That in turn decides what a stored claim holds. A rebuild of `source_chunks`
+moves every offset, so a `char_span` recorded against the old chunks silently
+stops meaning anything — this corpus was rebuilt three times in a single
+session. The **verbatim quote is the durable citation and the span is a derived
+cache**: relocate the quote, recompute the span, and a quote that can no longer
+be found marks its question for review. Same reasoning as asking the model for a
+quote instead of offsets, applied one layer down.
 
 Embeddings are a separate table rather than a column on chunks so that "drop the
 vectors and re-embed" is an operation you can actually perform. If dropping them
