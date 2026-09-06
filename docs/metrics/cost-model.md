@@ -88,35 +88,34 @@ deliverable for less than the price of a sandwich. Pay.
 ## One gateway or two
 
 OpenRouter carries embeddings as well as chat, including `gemini-embedding-001`
-at the same $0.15/M — they pass provider pricing through without markup. So the
-choice is not "which vendor" but "one integration or two".
+at the same $0.15/M — provider pricing passes through without markup. So the
+choice is not "which vendor" but "one integration or two", and every figure in
+this document holds either way:
 
-What going through OpenRouter costs: **no Batch API**, so every offline figure
-above roughly doubles. Building 500 questions goes $7.32 → ~$14, a weekly full
-eval $2.39 → ~$4.78/month. **About $10 over the life of the project.**
+- **Batch API, 50% off**, covering `/v1/chat/completions`, `/v1/responses`,
+  `/v1/messages` and **`/v1/embeddings`**, on a 24-hour window. Text only, which
+  is all this pipeline sends.
+- **`dimensions` on the embeddings endpoint**, so `gemini-embedding-001` can be
+  asked for 768 and fits `vector(768)` unchanged.
+- **`input_type`** (`search_document` / `search_query`), which is the
+  document/query asymmetry `embedding.py` already implements.
+- **Per-provider privacy routing** — providers that train on submitted data can
+  be excluded, and a request that cannot be routed privately fails rather than
+  quietly going somewhere it should not.
+- The judge's "must be a different model family" requirement becomes a string
+  change rather than a second vendor integration.
 
-What it buys: one key and one client for four jobs; per-provider privacy
-routing, so providers that train on submitted data can be excluded and a
-request that cannot be routed privately fails rather than leaking; and the
-neutrality judge's "must be a different model family" requirement becomes a
-string change instead of a second vendor integration.
+**Use OpenRouter for everything.** If the extra hop hurts the synchronous
+chatbot's latency, move that one path direct — it is the only latency-sensitive
+caller, and the only reason left to split.
 
-Ten dollars is not worth two integrations. **Use OpenRouter for everything**,
-and if the extra hop hurts the synchronous chatbot's latency, move that one
-path direct — it is the only latency-sensitive caller.
-
-### Test the dimension before routing embeddings through it
-
-**OpenRouter's embeddings endpoint does not document a `dimensions`
-parameter.** Its documented parameters are `model`, `input`, `encoding_format`
-and `provider`. If it does not pass dimension control through, then
-`gemini-embedding-001` through OpenRouter returns its native 3072 and does not
-fit `vector(768)` at all.
-
-Undocumented is not the same as absent, and one API call settles it. Make that
-call before committing the embedding path to OpenRouter — the rest of the
-"one gateway" argument above is unaffected either way, because chat is where
-the four jobs are.
+> Two earlier drafts of this section claimed OpenRouter had no Batch API and no
+> `dimensions` parameter. Both were wrong, and wrong the same way: read from the
+> FAQ and the docs overview, where the absence of a mention was treated as the
+> absence of a feature. The API reference has both. Worth recording because the
+> conclusions it produced — "offline costs double", "the embedding path has a
+> hole" — were confident, load-bearing, and would have driven a second
+> integration for no reason.
 
 ### Do not switch embedding models to save money
 
@@ -133,6 +132,15 @@ OpenAI's `text-embedding-3-*`, Gemini and Qwen3 all support Matryoshka
 truncation to an arbitrary size, while [voyage-4 offers only 256/512/1024/2048](https://docs.voyageai.com/docs/flexible-dimensions-and-quantization)
 and bge-m3 and Mistral Embed are fixed at 1024. So "other models need a
 migration" is true of some and false of others.
+
+A request for fewer dimensions is standard now, and standardised on OpenAI's
+spelling: `dimensions` in the OpenAI API and in gateways that normalise to it,
+`outputDimensionality` in Gemini's native API, `output_dimension` at Voyage and
+Cohere. The technique underneath is Matryoshka Representation Learning — the
+model is trained so that the first *k* components of its vector are themselves a
+valid *k*-dimension embedding. **The truncated vector must be re-normalised to
+unit length**, which `embedding.py` already does in `_unit()`; skipping it
+leaves cosine distance subtly wrong rather than obviously broken.
 
 **Vector spaces are not comparable, and that constraint no schema can remove.**
 A 768-dimension OpenAI vector and a 768-dimension Gemini vector describe
