@@ -25,9 +25,9 @@ the 1965 and 1970 volumes (1,363–1,451 headers, full coverage) and not on 1913
 1919 or 1956 (1–7). Measured in `docs/content-audit.md`, along with two traps
 worth not rediscovering. Until then, this rule holds and is safe.
 
-The five *framing* volumes all end strictly before their decision date, so
-nothing rule #1 protects straddles anything. The entire pre-vote corpus for five
-questions is available under this rule with no per-page work at all.
+Every *framing* volume ends strictly before its decision date, so nothing rule
+#1 protects straddles anything, and the whole pre-vote corpus is available
+under this rule with no per-page work at all.
 """
 
 import logging
@@ -48,6 +48,8 @@ CACHE = Path(__file__).resolve().parents[1] / ".cache"
 
 SOURCE_KEY = "archive:sim-congressional-record"
 _ARCHIVE_PREFIX = "sim_congressional-record-proceedings-and-debates_"
+# Not every volume uses the long form — the 1909 one is spelled this way.
+_SHORT_PREFIX = "sim_congressional-record_"
 
 
 @dataclass(frozen=True)
@@ -90,10 +92,19 @@ class Volume:
     @property
     def external_id_prefix(self) -> str:
         """Matches what the Medicare slice already stored, so re-ingesting that
-        volume collides on the UNIQUE constraint instead of duplicating it."""
-        return "sim_congressional-record_" + self.identifier.removeprefix(
-            _ARCHIVE_PREFIX
-        )
+        volume collides on the UNIQUE constraint instead of duplicating it.
+
+        Both archive.org spellings are stripped before the canonical one is
+        put back. The 1909 volume already begins with the short form, and
+        removing only the long form would have produced
+        `sim_congressional-record_sim_congressional-record_...` — unique, so
+        nothing would have failed, and wrong in the column that is supposed to
+        be this document's provenance.
+        """
+        tail = self.identifier
+        for prefix in (_ARCHIVE_PREFIX, _SHORT_PREFIX):
+            tail = tail.removeprefix(prefix)
+        return _SHORT_PREFIX + tail
 
     @property
     def title(self) -> str:
@@ -101,11 +112,19 @@ class Volume:
 
 
 def _v(ident: str, question_id: str, starts: date, ends: date) -> Volume:
+    """Most identifiers share the long prefix, so entries below give the tail.
+
+    Not all of them. The 1909 volume is `sim_congressional-record_...` with no
+    `-proceedings-and-debates`, so it is written out in full. Assuming one
+    prefix 404s on exactly one of thirteen, which is the kind of exception that
+    is invisible until it fires.
+    """
     return Volume(_ARCHIVE_PREFIX + ident, question_id, starts, ends)
 
 
-# The ten volumes now in the cache, two per question: the one ending before the
-# decision and the one containing it. Spans come from the archive.org titles.
+# Two volumes per question — the one ending before the decision and the one
+# containing it — plus three for the pair whose real debate is years earlier.
+# Spans come from the archive.org titles.
 #
 # us-affordable-care-act-2010 has no entry: the scanned series runs 1873-01-01
 # to 2008-06-23, so that question needs GovInfo's CREC daily edition and a key.
@@ -170,6 +189,37 @@ VOLUMES = (
         date(1913, 1, 26),
         date(1913, 2, 12),
     ),
+    # --- the debates that actually decided these two -------------------------
+    #
+    # Both questions are `constitutional_ratification`, so their decision_date
+    # is the day the 36th state ratified — and Congress voted years earlier.
+    # Picking volumes around the decision date gave income tax ZERO pre-vote
+    # chunks: the January 1913 volume says "income tax" once and "tariff" 98
+    # times, because Congress was busy with tariffs.
+    #
+    # These volumes still satisfy `published_date < decision_date` (1909 < 1913,
+    # 1917 < 1919) and sit inside the ten-year framing lookback, so they need no
+    # new mechanism. It is the same rule pointed at the right debate.
+    #
+    # Note the first identifier does NOT carry `-proceedings-and-debates`.
+    Volume(
+        "sim_congressional-record_june-17-july-13-1909_44",
+        "us-income-tax-1913",
+        date(1909, 6, 17),
+        date(1909, 7, 13),  # S.J.Res. 40: Senate 5 July, House 12 July — both here
+    ),
+    _v(
+        "july-24-august-29-1917_55",
+        "us-prohibition-1919",
+        date(1917, 7, 24),
+        date(1917, 8, 29),  # S.J.Res. 17 passed the Senate 1 August
+    ),
+    _v(
+        "december-03-1917-january-19-1918_56",
+        "us-prohibition-1919",
+        date(1917, 12, 3),
+        date(1918, 1, 19),  # and the House 17 December
+    ),
 )
 
 
@@ -195,6 +245,10 @@ def ingest_volume(volume: Volume) -> tuple[int, int]:
     normalised text — every char_span in the database refers to it. Chunking the
     normalised text while storing the raw would move every citation offset.
     """
+    if not volume.path.exists():
+        log.warning("%s is not in the cache yet; skipping", volume.identifier)
+        return 0, 0
+
     existing = already_ingested(volume)
     if existing:
         log.info("%s already has %d documents; skipping", volume.identifier, existing)
