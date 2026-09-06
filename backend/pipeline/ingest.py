@@ -27,8 +27,11 @@ import re
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 
+from sqlalchemy import func, select
+
 from shared.db import corpus
 from shared.db import engine as db_engine
+from shared.settings import get_settings
 
 log = logging.getLogger(__name__)
 
@@ -65,6 +68,24 @@ class Passage:
     text: str
 
 
+def _term_pattern(term: str) -> str:
+    """A search term, matched across the line breaks the OCR put inside it.
+
+    `normalise` collapses runs of spaces and tabs but deliberately leaves
+    newlines alone — `chunk` snaps to `\\n\\n` as its best boundary, so
+    flattening them would cost every chunk edge. The consequence is that the
+    Congressional Record's narrow columns leave a newline every ~40 characters,
+    and a multi-word term matched literally has to be lucky to fit between two
+    of them.
+
+    Measured on the volumes in the cache: "highway trust fund" went 16 hits to
+    22 and "federal aid highway" 5 to 6 once whitespace in the term matches any
+    whitespace in the text. Nothing about the offsets changes — the search runs
+    against the same stored string, so char_span stays valid.
+    """
+    return r"\s+".join(re.escape(word) for word in term.split())
+
+
 def extract_passages(text: str, terms: list[str], radius: int = PASSAGE_RADIUS):
     """Passages around every mention of any term, overlaps merged.
 
@@ -78,7 +99,7 @@ def extract_passages(text: str, terms: list[str], radius: int = PASSAGE_RADIUS):
     hits = sorted(
         (m.start(), m.end())
         for t in terms
-        for m in re.finditer(re.escape(t), text, re.IGNORECASE)
+        for m in re.finditer(_term_pattern(t), text, re.IGNORECASE)
     )
     spans: list[list[int]] = []
     for h_start, h_end in hits:
@@ -249,3 +270,54 @@ def store_passage(
         len(rows),
     )
     return document_id
+
+
+def embed_pending(*, batch: int = 200) -> tuple[int, int]:
+    """Vector every chunk that has none for the configured model.
+
+    Returns (embedded, already_had). Re-runnable by construction: the work list
+    is "chunks with no row in chunk_embeddings for this model", so a run that
+    dies partway costs only the batch it was in.
+
+    `model` is part of `chunk_embeddings`' primary key, so this can be run once
+    per model and both sets of vectors coexist — which is what makes an A/B
+    possible without a migration, provided both emit `EMBEDDING_DIM`.
+    """
+    from pipeline import embedding
+
+    model = get_settings().embedding_model
+    engine = db_engine.get_engine()
+
+    have = (
+        select(corpus.chunk_embeddings.c.chunk_id)
+        .where(corpus.chunk_embeddings.c.model == model)
+        .scalar_subquery()
+    )
+    todo_stmt = (
+        select(corpus.source_chunks.c.id, corpus.source_chunks.c.text)
+        .where(corpus.source_chunks.c.id.notin_(have))
+        .order_by(corpus.source_chunks.c.id)
+    )
+    with engine.connect() as conn:
+        todo = conn.execute(todo_stmt).all()
+        total = conn.execute(
+            select(func.count()).select_from(corpus.source_chunks)
+        ).scalar_one()
+
+    log.info(
+        "%s: %d chunks to embed, %d already done", model, len(todo), total - len(todo)
+    )
+    done = 0
+    for start in range(0, len(todo), batch):
+        window = todo[start : start + batch]
+        vectors = embedding.embed_documents([text for _, text in window])
+        now = datetime.now(UTC)
+        rows = [
+            {"chunk_id": cid, "model": model, "embedding": vec, "created_at": now}
+            for (cid, _), vec in zip(window, vectors, strict=True)
+        ]
+        with engine.begin() as conn:
+            conn.execute(corpus.chunk_embeddings.insert(), rows)
+        done += len(rows)
+        log.info("%s: stored %d/%d", model, done, len(todo))
+    return done, total - len(todo)
