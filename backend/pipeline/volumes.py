@@ -292,6 +292,87 @@ VOLUMES = (
         date(1956, 3, 8),
         date(1956, 3, 27),
     ),
+    # --- the 91st Congress 2nd session, up to the 10 June vote ----------------
+    #
+    # Air pollution was live across the whole session rather than confined to
+    # the bill's own floor time -- every volume here scores 45-286 term hits,
+    # and the strongest framing volume is February, not the one before the vote.
+    # NEPA was signed on 1 January 1970 and Earth Day fell on 22 April.
+    #
+    # These also cover the session's other 64 roll calls, which is what the
+    # question_id in uq_source_documents_source_external now makes reusable.
+    _v(
+        "january-19-27-1970_116",
+        "us-clean-air-act-1970",
+        date(1970, 1, 19),
+        date(1970, 1, 27),
+    ),
+    _v(
+        "january-28-february-6-1970_116",
+        "us-clean-air-act-1970",
+        date(1970, 1, 28),
+        date(1970, 2, 6),
+    ),
+    _v(
+        "february-9-19-1970_116",
+        "us-clean-air-act-1970",
+        date(1970, 2, 9),
+        date(1970, 2, 19),
+    ),
+    _v(
+        "february-20-march-2-1970_116",
+        "us-clean-air-act-1970",
+        date(1970, 2, 20),
+        date(1970, 3, 2),
+    ),
+    _v(
+        "march-3-11-1970_116",
+        "us-clean-air-act-1970",
+        date(1970, 3, 3),
+        date(1970, 3, 11),
+    ),
+    _v(
+        "march-12-20-1970_116",
+        "us-clean-air-act-1970",
+        date(1970, 3, 12),
+        date(1970, 3, 20),
+    ),
+    _v(
+        "march-23-31-1970_116",
+        "us-clean-air-act-1970",
+        date(1970, 3, 23),
+        date(1970, 3, 31),
+    ),
+    _v(
+        "april-1-10-1970_116",
+        "us-clean-air-act-1970",
+        date(1970, 4, 1),
+        date(1970, 4, 10),
+    ),
+    _v(
+        "april-13-21-1970_116",
+        "us-clean-air-act-1970",
+        date(1970, 4, 13),
+        date(1970, 4, 21),
+    ),
+    _v(
+        "april-23-may-4-1970_116",
+        "us-clean-air-act-1970",
+        date(1970, 4, 23),
+        date(1970, 5, 4),
+    ),
+    _v(
+        "may-5-13-1970_116",
+        "us-clean-air-act-1970",
+        date(1970, 5, 5),
+        date(1970, 5, 13),
+    ),
+    _v(
+        "may-14-22-1970_116",
+        "us-clean-air-act-1970",
+        date(1970, 5, 14),
+        date(1970, 5, 22),
+    ),
 )
 
 
