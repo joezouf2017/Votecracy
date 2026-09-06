@@ -146,8 +146,19 @@ Two things the matrix makes visible that weren't obvious in advance:
 
 ## What the remaining gaps need
 
-- `constitutional_ratification` needs a source for **state** ratification
-  votes. No congressional dataset has them at any date.
+- `constitutional_ratification` needs a source for the **state legislature's
+  vote breakdown**. The ratification *event* is not missing: the Congressional
+  Record records it on the day it happened, as a floor announcement (Nebraska,
+  the 36th state, 1919-01-16) or as a communication from a state's secretary of
+  state laid before the House (Delaware, 1913-02-03). Both are dated, citable,
+  and already in the corpus. What no congressional dataset carries is how that
+  state's members voted.
+
+  Note this vote_type covers **two** vote events. The congressional vote
+  *proposing* the amendment (S.J.Res. 40 in 1909, S.J.Res. 17 in 1917) is in
+  Voteview like any other roll call — only the ratification is not. Routing
+  that raises on `vote_type` alone cannot tell the two apart, which is why the
+  discriminator belongs on the *need* rather than the type.
 - `parliamentary_division` needs **Hansard**, which would also be the first
   non-US source and so the first test of the `jurisdictions` field.
 - `agency_rule` needs the **FCC's own record** (the 2015 order is FCC 15-24 in
