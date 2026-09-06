@@ -80,7 +80,30 @@ class Settings(BaseSettings):
     )
     gemini_api_key: SecretStr = Field(
         default=SecretStr(""),
-        description="Google AI Studio key. Offline pipeline only, never the vote path.",
+        description="Google AI Studio key. Direct access, kept for a fallback.",
+    )
+    openrouter_api_key: SecretStr = Field(
+        default=SecretStr(""),
+        description="One gateway for embeddings, generation and the judge.",
+    )
+
+    # The model is configuration; the dimension is not. `chunk_embeddings.
+    # embedding` is `vector(768)` in a migration, so the width is owned by
+    # `shared.db.engine.EMBEDDING_DIM` and `embedding.py` reads it from there
+    # rather than declaring a second 768 of its own.
+    #
+    # Changing this does not invalidate anything: `model` is part of
+    # `chunk_embeddings`' primary key, so vectors from two models coexist and
+    # `retrieval.nearest` requires the caller to say which one it wants. That
+    # is what makes an A/B possible without a migration — as long as both
+    # models can produce 768.
+    embedding_model: str = Field(
+        default="google/gemini-embedding-001",
+        description="OpenRouter slug. Must be able to emit EMBEDDING_DIM dimensions.",
+    )
+    user_agent: str = Field(
+        default="votecracy/0.1 (educational project; contact via repository)",
+        description="Sent by every outbound fetch. One string, not one per client.",
     )
 
     @field_validator("log_level")
