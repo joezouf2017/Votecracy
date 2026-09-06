@@ -307,19 +307,25 @@ harmless to keep but carries no debate.
 [`evaluation.md`](evaluation.md); this is what the existing content scores
 against it and what each question needs.
 
-| question | sentences the corpus supports | sentences with no number | figures still unsupported |
-|---|---|---|---|
-| medicare 1965 | 2 / 3 | 0 | 67,000,000 |
-| prohibition 1919 | 1 / 3 | 1 | 1933 |
-| interstate highway 1956 | 1 / 4 | 2 | 500,000,000,000 |
-| clean air 1970 | 3 / 4 | 1 | — |
-| net neutrality 2015 | 1 / 4 | 2 | 2024 |
-| ACA 2010 | 3 / 4 | 1 | — |
-| income tax 1913 | **0 / 3** | 2 | 94 |
-| NHS 1946 | 1 / 3 | 1 | 5,000,000 · 8,000,000 |
-| **total** | **12 / 28** | **10 (36%)** | |
+<!-- generated: outcome-support -->
+| question | outcome figures the corpus carries | still missing |
+|---|---|---|
+| us-medicare-1965 | 3/4 | 67,000,000 |
+| us-prohibition-1919 | 2/2 | — |
+| us-interstate-highway-1956 | 2/2 | — |
+| us-clean-air-act-1970 | 5/5 | — |
+| us-net-neutrality-2015 | 2/3 | 2,024 |
+| us-affordable-care-act-2010 | 5/5 | — |
+| us-income-tax-1913 | 2/2 | — |
+| uk-national-health-service-1946 | 3/4 | 8,000,000 |
 
-Reproduce it:
+**This table overstates support and is kept anyway, because the way it overstates is the point.** It asks whether a value appears *anywhere* in the post-vote corpus, not whether it appears as the thing the sentence claims. Measured live: NHS's `5,000,000` reads as supported, and the two actual occurrences are "£5 million above what was originally anticipated" and "an additional sum of nearly £5 million is required" — money, not dental treatments.
+
+That is exactly why [`evaluation.md`](evaluation.md) requires a quote carrying the value in its own sentence's context. Until the generator enforces it, read this as an upper bound.
+<!-- /generated -->
+
+The sentence-level counts behind this, including the 36% that assert no number
+at all, are reproducible with:
 
 ```bash
 PYTHONPATH=backend ./.venv/Scripts/python.exe -c "

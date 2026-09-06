@@ -10,31 +10,50 @@ unchecked). Do not treat a lead as a plan.
 
 ## Status per question
 
-*Updated 2026-09-05. All eight are now served; what is left is depth, not
-coverage.*
+*Generated. Do not hand-edit the blocks below — run `docs/refresh.py`.*
 
-| question | pre-vote | post-vote | sources |
-|---|---|---|---|
-| ACA 2010 | 9,573 | 7,801 | GovInfo `CREC` |
-| medicare 1965 | 3,743 | 2,379 | archive.org, loc.gov |
-| clean air 1970 | 3,180 | 1,596 | archive.org |
-| income tax 1913 | 1,699 | 78 | archive.org, loc.gov |
-| NHS 1946 | 1,229 | 923 | Hansard |
-| prohibition 1919 | 847 | 120 | archive.org, loc.gov |
-| interstate highway 1956 | 782 | 192 | archive.org, loc.gov |
-| net neutrality 2015 | 347 | 1,811 | GovInfo `FR` |
+<!-- generated: corpus-status -->
+**2,822 documents · 43,875 chunks · 4 document sources.** Voteview is a fifth source and appears nowhere in this table: it supplies candidates, not documents.
 
-**Every question has both sides, and every pre-vote chunk verifies clean** —
-`role='framing'`, `published_date` strictly before its decision, zero
-violations. 2,777 documents and 36,300 chunks across five sources.
+| source | documents |
+|---|---|
+| `archive:sim-congressional-record` | 2,355 |
+| `loc:chronicling-america` | 306 |
+| `govinfo` | 142 |
+| `hansard` | 19 |
 
-What remains is not coverage but two specific thinnesses:
+| embedding model | vectors |
+|---|---|
+| `google/gemini-embedding-001` | 8,646 |
+| `qwen/qwen3-embedding-8b` | 43,875 |
+<!-- /generated -->
 
-- **income tax and prohibition have shallow post-vote corpora** (78 and 120
-  chunks). Both reached their outcome material by accident, via newspaper
-  searches with wide date ranges, rather than by anyone choosing volumes.
-- **no source measures anything yet.** Every one of the five records what
-  someone *said*. See §6 and "What to do next".
+<!-- generated: question-coverage -->
+| question | pre-vote | post-vote | outcome reaches | rule #1 violations |
+|---|---|---|---|---|
+| us-affordable-care-act-2010 | 9,573 | 7,801 | +2,481d | 0 |
+| us-medicare-1965 | 3,743 | 2,474 | +18,185d | 0 |
+| us-clean-air-act-1970 | 3,180 | 2,621 | +8,667d | 0 |
+| us-income-tax-1913 | 1,699 | 1,637 | +30,184d | 0 |
+| uk-national-health-service-1946 | 1,229 | 1,483 | +1,182d | 0 |
+| us-prohibition-1919 | 847 | 2,823 | +29,350d | 0 |
+| us-interstate-highway-1956 | 782 | 1,825 | +13,831d | 0 |
+| us-net-neutrality-2015 | 347 | 1,811 | +1,092d | 0 |
+
+**Rule #1 violations across all questions: 0.** Every pre-vote chunk is `role='framing'` with `published_date` strictly before its decision.
+<!-- /generated -->
+
+What remains is not coverage and no longer depth either — the recent-CREC
+top-up closed that. One thing is left, and the table above cannot show it:
+
+- **No source measures anything.** Every source wired so far records what
+  someone *said*, so every numeric outcome claim is testimony rather than
+  evidence. That is what §6 and "What to do next" are for.
+
+*(The bullet that stood here claimed income tax and prohibition had shallow
+post-vote corpora. It was written minutes before the block above was generated,
+and the block disproves it — 1,637 and 2,823 chunks. Left as a note because it
+is the exact failure `refresh.py` exists to make impossible.)*
 
 ---
 

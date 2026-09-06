@@ -98,6 +98,22 @@ alembic check                      # models vs live database: any drift?
 Needs the venv active and Postgres up. The container applies migrations itself
 before starting the app, so this is only for authoring them.
 
+## Keeping the docs honest
+
+```bash
+python docs/refresh.py            # rewrite the measured blocks
+python docs/refresh.py --check    # fail if any is stale, change nothing
+```
+
+Parts of `docs/` are measurements of the live corpus, and a number typed into
+prose has no link to whatever produced it — so nothing notices when it stops
+being true. Those parts sit inside `<!-- generated: … -->` markers and come from
+this script; everything outside them is hand-written and does not rot.
+
+Same category as `alembic check`: needs a real database, deliberately not in the
+test suite (which is container-free), run after anything that changes the
+corpus.
+
 ## Load testing
 
 ```bash
