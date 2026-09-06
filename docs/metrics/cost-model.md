@@ -105,22 +105,68 @@ Ten dollars is not worth two integrations. **Use OpenRouter for everything**,
 and if the extra hop hurts the synchronous chatbot's latency, move that one
 path direct — it is the only latency-sensitive caller.
 
+### Test the dimension before routing embeddings through it
+
+**OpenRouter's embeddings endpoint does not document a `dimensions`
+parameter.** Its documented parameters are `model`, `input`, `encoding_format`
+and `provider`. If it does not pass dimension control through, then
+`gemini-embedding-001` through OpenRouter returns its native 3072 and does not
+fit `vector(768)` at all.
+
+Undocumented is not the same as absent, and one API call settles it. Make that
+call before committing the embedding path to OpenRouter — the rest of the
+"one gateway" argument above is unaffected either way, because chat is where
+the four jobs are.
+
 ### Do not switch embedding models to save money
 
 The catalogue has models at $0.004–$0.01/M against gemini-embedding-001's
 $0.15, which would take the 500-question embedding line from $2.58 to about
-$0.35. That saving is not real, for two reasons.
+$0.35. Embedding is 35% of a one-off build that costs less than a sandwich and
+generation dominates it anyway, so the saving is not the point. What matters is
+what a switch actually costs, and that is two separate things which are easy to
+conflate:
 
-Embedding is 35% of a one-off build that costs less than a sandwich, and
-generation dominates it anyway. And the dimension is not a config value:
-`chunk_embeddings.embedding` is `vector(768)` in a migration, so a model that
-does not emit 768 needs a schema change and a full re-embed. `model` sits in
-that table's primary key so two can coexist during a swap — but the column
-width is still fixed.
+**The column width is a schema constraint.** `chunk_embeddings.embedding` is
+`vector(768)`, set in a migration. Some models can meet it and some cannot —
+OpenAI's `text-embedding-3-*`, Gemini and Qwen3 all support Matryoshka
+truncation to an arbitrary size, while [voyage-4 offers only 256/512/1024/2048](https://docs.voyageai.com/docs/flexible-dimensions-and-quantization)
+and bge-m3 and Mistral Embed are fixed at 1024. So "other models need a
+migration" is true of some and false of others.
+
+**Vector spaces are not comparable, and that constraint no schema can remove.**
+A 768-dimension OpenAI vector and a 768-dimension Gemini vector describe
+different spaces; cosine distance between them is arithmetic without meaning.
+This — not the column width — is why `model` is part of the primary key and why
+`retrieval.nearest` takes `model` as a required argument with no default. **Any
+model switch means re-embedding every chunk**, whatever the dimension, and that
+is the real cost.
 
 The one reason that would justify switching is **retrieval quality on OCR'd
 1960s newsprint**, which Set 2's recall@k measures directly. Switch on that
 evidence, never on the price.
+
+### The schema cannot A/B two embedding models, and that is now a gap
+
+Recommending a recall@k comparison and fixing the column at 768 are in tension:
+an A/B against a model that emits 1024 needs both widths present at once, and
+`vector(768)` forbids it. The table was designed to make *replacement* easy —
+embeddings are a separate table from chunks precisely so "drop the vectors and
+re-embed" is an operation you can perform, and `model` in the key lets two
+coexist during a swap — but replacement at one width is not comparison at two.
+
+The fixed width was the right call when it was made, and for a reason that
+still holds: it makes the database reject a wrong-sized vector at write time. A
+dimension mismatch is otherwise a silent ranking bug rather than an error, which
+is why `nearest` re-checks the length in Python before building the query.
+
+What changed is that an A/B is now planned. When it happens, the migration is
+small: `vector` without a modifier, plus a `dimension` column, moving the check
+from the database into the write path. Unconstrained `vector` costs nothing
+here specifically because **there is no ANN index** — a fixed width mainly buys
+indexability, and that argument was already given up on measurement (1.8 ms
+scoped exact scan against 382 ms unscoped). Do it when the A/B is real, not
+before.
 
 ## Caveats worth naming
 
