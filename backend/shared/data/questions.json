@@ -37,8 +37,7 @@
       "bill_number": "S.J.Res. 17",
       "congress": 65,
       "search_terms": [
-        "national prohibition amendment",
-        "eighteenth amendment",
+        "prohibition amendment",
         "intoxicating liquors"
       ]
     },
@@ -173,9 +172,8 @@
       "bill_number": "S.J.Res. 40",
       "congress": 61,
       "search_terms": [
-        "income tax amendment",
-        "sixteenth amendment",
-        "taxes on incomes"
+        "income tax",
+        "sixteenth amendment"
       ]
     },
     "prompt": "It's 1913. Congress is debating the 16th Amendment, which would allow a permanent federal income tax. The initial rate would be just 1% on income above $3,000 (about $90,000 today). Opponents warn rates will inevitably rise. Do you support ratification?",

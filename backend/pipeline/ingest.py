@@ -68,22 +68,34 @@ class Passage:
     text: str
 
 
+# A term's words may be separated in the text by any run of whitespace or
+# hyphens, or by nothing at all. Three different corruptions make that
+# necessary, and all three were measured rather than guessed:
+#
+# 1. `normalise` collapses spaces and tabs but deliberately leaves newlines —
+#    `chunk` snaps to `\n\n` as its best boundary, so flattening them would
+#    cost every chunk edge. The Record's narrow columns then put a newline
+#    every ~40 characters, and a literal multi-word match has to be lucky to
+#    fit between two. "highway trust fund" went 16 hits to 22.
+# 2. The same phrase appears hyphenated and unhyphenated in one volume:
+#    "income tax" 804 times and "income-tax" 346 in the 1909 record.
+# 3. `normalise`'s de-hyphenation rejoins a line-broken word, and a genuinely
+#    hyphenated lower-case compound is indistinguishable from one. Its
+#    docstring called that a residual risk not yet seen; it fires 60 times
+#    across this cache, 22 of them turning "income-tax" into "incometax" —
+#    on the single most important term for that question.
+#
+# Zero-or-more rather than one-or-more is what covers case 3. It cannot widen a
+# match beyond the term's own words, and the search runs against the same
+# stored string, so every char_span stays valid.
+_TERM_SEPARATOR = re.compile(r"[\s-]+")
+
+
 def _term_pattern(term: str) -> str:
-    """A search term, matched across the line breaks the OCR put inside it.
-
-    `normalise` collapses runs of spaces and tabs but deliberately leaves
-    newlines alone — `chunk` snaps to `\\n\\n` as its best boundary, so
-    flattening them would cost every chunk edge. The consequence is that the
-    Congressional Record's narrow columns leave a newline every ~40 characters,
-    and a multi-word term matched literally has to be lucky to fit between two
-    of them.
-
-    Measured on the volumes in the cache: "highway trust fund" went 16 hits to
-    22 and "federal aid highway" 5 to 6 once whitespace in the term matches any
-    whitespace in the text. Nothing about the offsets changes — the search runs
-    against the same stored string, so char_span stays valid.
-    """
-    return r"\s+".join(re.escape(word) for word in term.split())
+    """A search term, matched across whatever the OCR did to the gaps in it."""
+    return r"[\s-]*".join(
+        re.escape(word) for word in _TERM_SEPARATOR.split(term.strip()) if word
+    )
 
 
 def extract_passages(text: str, terms: list[str], radius: int = PASSAGE_RADIUS):
